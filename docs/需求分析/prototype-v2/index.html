@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>大模型监测管理平台 - 原型 v2</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; }
+    .app-layout { display: flex; min-height: 100vh; }
+    .sidebar { width: 240px; background: #001529; color: #fff; flex-shrink: 0; display: flex; flex-direction: column; }
+    .sidebar-logo { padding: 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-logo h2 { font-size: 18px; font-weight: 700; }
+    .sidebar-logo small { font-size: 11px; opacity: 0.6; }
+    .sidebar-nav { flex: 1; padding: 8px 0; overflow-y: auto; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 12px 20px; cursor: pointer; color: rgba(255,255,255,0.65); transition: all 0.2s; border-left: 3px solid transparent; }
+    .nav-item:hover { color: #fff; background: rgba(255,255,255,0.08); }
+    .nav-item.active { color: #fff; background: #1890ff; border-left-color: #1890ff; }
+    .nav-item i { font-size: 18px; width: 20px; text-align: center; }
+    .nav-item .badge { margin-left: auto; }
+    .nav-section-title { padding: 12px 20px 4px; font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.35); letter-spacing: 1px; }
+    .main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .topbar { height: 56px; background: #fff; border-bottom: 1px solid #e8e8e8; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
+    .topbar h5 { font-size: 16px; font-weight: 600; margin: 0; }
+    .topbar-right { display: flex; align-items: center; gap: 16px; }
+    .topbar-right .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: #1890ff; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .content { flex: 1; padding: 24px; overflow-y: auto; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .stat-card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .stat-card .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+    .stat-card .stat-value { font-size: 28px; font-weight: 700; line-height: 1.2; }
+    .stat-card .stat-label { font-size: 13px; color: #8c8c8c; margin-top: 4px; }
+    .table-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .table-card .card-header { padding: 16px 20px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; }
+    .table-card .card-body { padding: 0; }
+    .table-card table { margin: 0; }
+    .table-card th { background: #fafafa; font-weight: 600; font-size: 13px; color: #595959; }
+    .table-card td { vertical-align: middle; }
+    .status-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+    .status-online { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+    .status-offline { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; }
+    .status-warning { background: #fffbe6; color: #faad14; border: 1px solid #ffe58f; }
+    .status-pending { background: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
+    .chart-mock { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; padding: 24px; color: #fff; min-height: 200px; }
+    .chart-mock .chart-bars { display: flex; align-items: flex-end; gap: 8px; height: 120px; }
+    .chart-mock .bar { flex: 1; background: rgba(255,255,255,0.3); border-radius: 4px 4px 0 0; min-height: 8px; }
+    .chart-mock .bar:nth-child(1) { height: 40%; }
+    .chart-mock .bar:nth-child(2) { height: 65%; }
+    .chart-mock .bar:nth-child(3) { height: 50%; }
+    .chart-mock .bar:nth-child(4) { height: 80%; }
+    .chart-mock .bar:nth-child(5) { height: 70%; }
+    .chart-mock .bar:nth-child(6) { height: 90%; }
+    .chart-mock .bar:nth-child(7) { height: 60%; }
+    .chart-mock .bar:nth-child(8) { height: 75%; }
+    .chart-mock .bar:nth-child(9) { height: 55%; }
+    .chart-mock .bar:nth-child(10) { height: 85%; }
+    .chart-mock .bar:nth-child(11) { height: 72%; }
+    .chart-mock .bar:nth-child(12) { height: 95%; }
+    .chart-mock .bar.highlight { background: rgba(255,255,255,0.7); }
+    .chart-placeholder { background: #fff; border-radius: 8px; padding: 20px; min-height: 250px; display: flex; align-items: center; justify-content: center; color: #d9d9d9; font-size: 14px; border: 2px dashed #e8e8e8; }
+    .form-card { background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .proto-badge { position: fixed; bottom: 12px; right: 12px; background: #722ed1; color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 12px; z-index: 9999; opacity: 0.8; pointer-events: none; }
+    @media (max-width: 768px) {
+      .sidebar { width: 60px; }
+      .sidebar-logo h2, .sidebar-logo small, .nav-item span, .nav-section-title, .sidebar .badge { display: none; }
+      .nav-item { justify-content: center; padding: 12px; }
+      .nav-item i { font-size: 20px; }
+    }
+    .nav-tabs .nav-link { color: #595959; font-size: 14px; }
+    .nav-tabs .nav-link.active { font-weight: 600; color: #1890ff; }
+    .compare-row { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px; }
+    .compare-card { flex: 1; min-width: 220px; background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); text-align: center; }
+    .compare-card.winner { border: 2px solid #52c41a; position: relative; }
+    .compare-card.winner::after { content: '🏆 最优'; position: absolute; top: -8px; right: -8px; background: #52c41a; color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+    .compare-card .model-score { font-size: 36px; font-weight: 700; }
+    .tag-dingtalk { background: #f0f5ff; color: #1890ff; border: 1px solid #adc6ff; border-radius: 4px; padding: 2px 8px; font-size: 12px; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <h2><i class="bi bi-cpu me-2"></i>AI 网关</h2>
+      <small>大模型监测管理平台</small>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')">
+        <i class="bi bi-grid-1x2"></i><span>总览大屏</span>
+      </div>
+      <div class="nav-section-title">核心管理</div>
+      <div class="nav-item" data-page="models" onclick="switchPage('models')">
+        <i class="bi bi-box"></i><span>模型管理</span>
+        <span class="badge bg-success rounded-pill">6</span>
+      </div>
+      <div class="nav-item" data-page="keys" onclick="switchPage('keys')">
+        <i class="bi bi-key"></i><span>Key 管理</span>
+        <span class="badge bg-warning text-dark rounded-pill">12</span>
+      </div>
+      <div class="nav-item" data-page="tokens" onclick="switchPage('tokens')">
+        <i class="bi bi-bar-chart-fill"></i><span>Token 统计</span>
+      </div>
+      <div class="nav-item" data-page="gateway" onclick="switchPage('gateway')">
+        <i class="bi bi-shuffle"></i><span>统一网关</span>
+      </div>
+      <div class="nav-section-title">进阶能力</div>
+      <div class="nav-item" data-page="compare" onclick="switchPage('compare')">
+        <i class="bi bi-bar-chart-steps"></i><span>模型对比评估</span>
+      </div>
+      <div class="nav-item" data-page="finetune" onclick="switchPage('finetune')">
+        <i class="bi bi-sliders"></i><span>模型微调</span>
+      </div>
+      <div class="nav-section-title">系统管理</div>
+      <div class="nav-item" data-page="settings" onclick="switchPage('settings')">
+        <i class="bi bi-gear"></i><span>系统配置</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main-area">
+    <div class="topbar">
+      <h5 id="pageTitle">总览大屏</h5>
+      <div class="topbar-right">
+        <span class="text-muted" style="font-size:13px;"><i class="bi bi-clock-history me-1"></i>最后更新: 刚刚</span>
+        <i class="bi bi-bell text-muted" style="font-size:18px;cursor:pointer;"></i>
+        <div class="user-avatar">管</div>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- ============ PAGE: Dashboard ============ -->
+      <div class="page active" id="page-dashboard">
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <div class="stat-card d-flex align-items-center gap-3">
+              <div class="stat-icon" style="background:#e6f7ff;color:#1890ff;"><i class="bi bi-cpu"></i></div>
+              <div>
+                <div class="stat-value">6</div>
+                <div class="stat-label">已接入模型</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card d-flex align-items-center gap-3">
+              <div class="stat-icon" style="background:#f6ffed;color:#52c41a;"><i class="bi bi-key"></i></div>
+              <div>
+                <div class="stat-value">24</div>
+                <div class="stat-label">活跃 Key</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card d-flex align-items-center gap-3">
+              <div class="stat-icon" style="background:#fffbe6;color:#faad14;"><i class="bi bi-lightning-charge"></i></div>
+              <div>
+                <div class="stat-value">1.2M</div>
+                <div class="stat-label">今日 Token</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card d-flex align-items-center gap-3">
+              <div class="stat-icon" style="background:#fff0f6;color:#eb2f96;"><i class="bi bi-arrow-left-right"></i></div>
+              <div>
+                <div class="stat-value">8.5K</div>
+                <div class="stat-label">今日请求量</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-8">
+            <div class="stat-card">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="m-0 fw-bold">Token 用量趋势</h6>
+                <select class="form-select form-select-sm" style="width:auto;">
+                  <option>近 7 天</option><option>近 30 天</option><option>自定义</option>
+                </select>
+              </div>
+              <div class="chart-mock">
+                <div class="d-flex justify-content-between mb-2" style="font-size:12px;opacity:0.8;">
+                  <span>0</span><span>500K</span><span>1M</span><span>1.5M</span>
+                </div>
+                <div class="chart-bars">
+                  <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                  <div class="bar"></div><div class="bar"></div><div class="bar highlight"></div>
+                  <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                  <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                </div>
+                <div class="d-flex justify-content-between mt-2" style="font-size:11px;opacity:0.7;">
+                  <span>周一</span><span>周二</span><span>周三</span><span>周四</span>
+                  <span>周五</span><span>今天</span><span>周日</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="stat-card h-100">
+              <h6 class="fw-bold mb-3">模型调用分布</h6>
+              <div style="background:#fafafa;border-radius:8px;padding:16px;">
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between mb-1"><span>DeepSeek-V3</span><span>45%</span></div>
+                  <div class="progress" style="height:8px;"><div class="progress-bar" style="width:45%;background:#1890ff;"></div></div>
+                </div>
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between mb-1"><span>GPT-4o</span><span>28%</span></div>
+                  <div class="progress" style="height:8px;"><div class="progress-bar" style="width:28%;background:#52c41a;"></div></div>
+                </div>
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between mb-1"><span>通义千问</span><span>18%</span></div>
+                  <div class="progress" style="height:8px;"><div class="progress-bar" style="width:18%;background:#faad14;"></div></div>
+                </div>
+                <div>
+                  <div class="d-flex justify-content-between mb-1"><span>文心一言</span><span>9%</span></div>
+                  <div class="progress" style="height:8px;"><div class="progress-bar" style="width:9%;background:#eb2f96;"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="table-card">
+              <div class="card-header"><span class="fw-bold">模型运行状态</span><a href="#" class="text-decoration-none" style="font-size:13px;" onclick="switchPage('models')">查看全部 <i class="bi bi-chevron-right"></i></a></div>
+              <div class="card-body">
+                <table class="table table-hover">
+                  <thead><tr><th>模型名称</th><th>状态</th><th>响应时间</th><th>QPS</th></tr></thead>
+                  <tbody>
+                    <tr><td>DeepSeek-V3</td><td><span class="status-badge status-online">● 在线</span></td><td>320ms</td><td>45</td></tr>
+                    <tr><td>GPT-4o</td><td><span class="status-badge status-online">● 在线</span></td><td>480ms</td><td>32</td></tr>
+                    <tr><td>通义千问-Plus</td><td><span class="status-badge status-warning">● 高延迟</span></td><td>1.2s</td><td>18</td></tr>
+                    <tr><td>文心一言-4.0</td><td><span class="status-badge status-online">● 在线</span></td><td>560ms</td><td>22</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="table-card">
+              <div class="card-header"><span class="fw-bold">最近请求日志</span><a href="#" class="text-decoration-none" style="font-size:13px;" onclick="switchPage('gateway')">查看全部 <i class="bi bi-chevron-right"></i></a></div>
+              <div class="card-body">
+                <table class="table table-hover">
+                  <thead><tr><th>时间</th><th>应用</th><th>模型</th><th>Token</th><th>状态</th></tr></thead>
+                  <tbody>
+                    <tr><td>14:32:15</td><td>智能客服</td><td>DeepSeek-V3</td><td>1,240</td><td><span class="status-badge status-online">成功</span></td></tr>
+                    <tr><td>14:31:50</td><td>代码助手</td><td>GPT-4o</td><td>3,560</td><td><span class="status-badge status-online">成功</span></td></tr>
+                    <tr><td>14:31:12</td><td>内容生成</td><td>通义千问</td><td>870</td><td><span class="status-badge status-warning">限流</span></td></tr>
+                    <tr><td>14:30:45</td><td>数据分析</td><td>DeepSeek-V3</td><td>2,100</td><td><span class="status-badge status-online">成功</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: 模型管理 ============ -->
+      <div class="page" id="page-models">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div><input type="text" class="form-control" placeholder="搜索模型..." style="width:260px;"></div>
+          <div><button class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>接入模型</button></div>
+        </div>
+        <div class="table-card">
+          <div class="card-body">
+            <table class="table table-hover">
+              <thead><tr><th>模型名称</th><th>提供商</th><th>版本</th><th>状态</th><th>响应时间</th><th>QPS 限制</th><th>操作</th></tr></thead>
+              <tbody>
+                <tr><td><strong>DeepSeek-V3</strong></td><td>DeepSeek</td><td>v3.0</td><td><span class="status-badge status-online">● 在线</span></td><td>320ms</td><td>100</td><td><button class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger"><i class="bi bi-stop"></i></button></td></tr>
+                <tr><td><strong>GPT-4o</strong></td><td>OpenAI</td><td>gpt-4o-2024-08</td><td><span class="status-badge status-online">● 在线</span></td><td>480ms</td><td>80</td><td><button class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger"><i class="bi bi-stop"></i></button></td></tr>
+                <tr><td><strong>通义千问-Plus</strong></td><td>阿里云</td><td>qwen-plus</td><td><span class="status-badge status-warning">● 高延迟</span></td><td>1.2s</td><td>50</td><td><button class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger"><i class="bi bi-stop"></i></button></td></tr>
+                <tr><td><strong>文心一言-4.0</strong></td><td>百度</td><td>ERNIE-4.0</td><td><span class="status-badge status-online">● 在线</span></td><td>560ms</td><td>60</td><td><button class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger"><i class="bi bi-stop"></i></button></td></tr>
+                <tr><td><strong>Claude 3.5 Sonnet</strong></td><td>Anthropic</td><td>claude-3.5-sonnet</td><td><span class="status-badge status-offline">● 离线</span></td><td>-</td><td>40</td><td><button class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-success"><i class="bi bi-play"></i> 启用</button></td></tr>
+                <tr><td><strong>Gemini 1.5 Pro</strong></td><td>Google</td><td>gemini-1.5-pro</td><td><span class="status-badge status-pending">● 待配置</span></td><td>-</td><td>-</td><td><button class="btn btn-sm btn-outline-primary"><i class="bi bi-gear"></i> 配置</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="row g-3 mt-2">
+          <div class="col-md-6">
+            <div class="form-card">
+              <h6 class="fw-bold mb-3"><i class="bi bi-gear me-2"></i>模型配置</h6>
+              <div class="mb-3">
+                <label class="form-label">模型名称</label>
+                <input type="text" class="form-control" value="DeepSeek-V3" disabled>
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label">API 地址</label>
+                  <input type="text" class="form-control" value="https://api.deepseek.com/v1/chat/completions">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">API Key</label>
+                  <input type="password" class="form-control" value="sk-xxxxxxxxxxxxxxxx">
+                </div>
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                  <label class="form-label">QPS 上限</label>
+                  <input type="number" class="form-control" value="100">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">超时时间 (s)</label>
+                  <input type="number" class="form-control" value="60">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">模型权重</label>
+                  <input type="number" class="form-control" value="5">
+                </div>
+              </div>
+              <button class="btn btn-primary">保存配置</button>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-card">
+              <h6 class="fw-bold mb-3"><i class="bi bi-clock-history me-2"></i>版本管理</h6>
+              <table class="table table-sm">
+                <thead><tr><th>版本</th><th>发布时间</th><th>状态</th><th>操作</th></tr></thead>
+                <tbody>
+                  <tr><td>v3.0</td><td>2024-12-15</td><td><span class="status-badge status-online">当前</span></td><td><button class="btn btn-sm btn-link">回滚</button></td></tr>
+                  <tr><td>v2.5</td><td>2024-10-01</td><td><span class="status-badge status-offline">历史</span></td><td><button class="btn btn-sm btn-link">恢复</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: Key 管理 ============ -->
+      <div class="page" id="page-keys">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="d-flex gap-2">
+            <input type="text" class="form-control" placeholder="搜索 Key 或应用..." style="width:220px;">
+            <select class="form-select" style="width:140px;">
+              <option>全部状态</option><option>启用</option><option>已禁用</option><option>已过期</option>
+            </select>
+          </div>
+          <div><button class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>生成 Key</button></div>
+        </div>
+        <div class="table-card">
+          <div class="card-body">
+            <table class="table table-hover">
+              <thead><tr><th>Key 名称</th><th>API Key</th><th>应用</th><th>状态</th><th>速率限制</th><th>已用 Token</th><th>过期时间</th><th>操作</th></tr></thead>
+              <tbody>
+                <tr><td>智能客服 Key</td><td><code>sk-8a3f...b1e2</code></td><td>智能客服系统</td><td><span class="status-badge status-online">启用</span></td><td>100/min</td><td>2,350,000</td><td>2025-12-31</td><td><button class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button></td></tr>
+                <tr><td>代码助手 Key</td><td><code>sk-4c7d...f9a0</code></td><td>代码助手插件</td><td><span class="status-badge status-online">启用</span></td><td>60/min</td><td>4,120,000</td><td>2025-10-15</td><td><button class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button></td></tr>
+                <tr><td>数据报表 Key</td><td><code>sk-2e5f...d3c8</code></td><td>数据报表系统</td><td><span class="status-badge status-warning">● 即将过期</span></td><td>30/min</td><td>890,000</td><td>2025-02-01</td><td><button class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i></button></td></tr>
+                <tr><td>测试环境 Key</td><td><code>sk-9b1a...e7f4</code></td><td>测试环境</td><td><span class="status-badge status-pending">● 已禁用</span></td><td>20/min</td><td>50,000</td><td>2025-06-30</td><td><button class="btn btn-sm btn-outline-success"><i class="bi bi-play"></i> 启用</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="form-card mt-3">
+          <h6 class="fw-bold mb-3"><i class="bi bi-plus-circle me-2"></i>生成新 API Key</h6>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Key 名称 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" placeholder="例如: 生产环境 Key">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">关联应用 <span class="text-danger">*</span></label>
+              <select class="form-select"><option>选择应用...</option><option>智能客服</option><option>代码助手</option></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">可调用模型</label>
+              <select class="form-select" multiple style="height:80px;">
+                <option>DeepSeek-V3</option><option>GPT-4o</option><option>通义千问</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">速率限制</label>
+              <input type="number" class="form-control" value="100" placeholder="次/分钟">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Token 上限</label>
+              <input type="number" class="form-control" value="1000000" placeholder="总量">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">过期时间</label>
+              <input type="date" class="form-control">
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+              <button class="btn btn-primary w-100"><i class="bi bi-key me-1"></i>立即生成</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: Token 统计 ============ -->
+      <div class="page" id="page-tokens">
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <div class="stat-card"><div class="stat-value">1,245,678</div><div class="stat-label">今日 Token 用量</div></div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card"><div class="stat-value">8,456</div><div class="stat-label">今日请求次数</div></div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card"><div class="stat-value">¥ 12.45</div><div class="stat-label">今日费用估算</div></div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card"><div class="stat-value">¥ 345.20</div><div class="stat-label">本月累计费用</div></div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <ul class="nav nav-tabs">
+            <li class="nav-item"><a class="nav-link active" href="#">按模型</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">按应用</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">按用户</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">费用账单</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">预警规则</a></li>
+          </ul>
+        </div>
+        <div class="table-card">
+          <div class="card-header">
+            <span class="fw-bold">按模型统计 (本月)</span>
+            <div>
+              <button class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-download"></i> 导出报表</button>
+              <button class="btn btn-sm btn-outline-primary"><i class="bi bi-bell"></i> 设置预警</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <table class="table table-hover">
+              <thead><tr><th>模型</th><th>请求次数</th><th>输入 Token</th><th>输出 Token</th><th>总计 Token</th><th>费用估算</th><th>占比</th></tr></thead>
+              <tbody>
+                <tr><td>DeepSeek-V3</td><td>125,430</td><td>18,250,000</td><td>3,450,000</td><td>21,700,000</td><td>¥ 108.50</td><td><div class="progress" style="height:6px;width:100px;"><div class="progress-bar" style="width:45%"></div></div></td></tr>
+                <tr><td>GPT-4o</td><td>68,200</td><td>9,800,000</td><td>1,920,000</td><td>11,720,000</td><td>¥ 234.40</td><td><div class="progress" style="height:6px;width:100px;"><div class="progress-bar" style="width:28%;background:#52c41a;"></div></div></td></tr>
+                <tr><td>通义千问</td><td>42,150</td><td>5,680,000</td><td>1,120,000</td><td>6,800,000</td><td>¥ 34.00</td><td><div class="progress" style="height:6px;width:100px;"><div class="progress-bar" style="width:18%;background:#faad14;"></div></div></td></tr>
+                <tr><td>文心一言</td><td>18,750</td><td>2,450,000</td><td>510,000</td><td>2,960,000</td><td>¥ 14.80</td><td><div class="progress" style="height:6px;width:100px;"><div class="progress-bar" style="width:9%;background:#eb2f96;"></div></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="form-card mt-3">
+          <h6 class="fw-bold mb-3"><i class="bi bi-bell me-2"></i>用量预警设置</h6>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">日用量预警阈值</label>
+              <div class="input-group"><input type="number" class="form-control" value="1000000"><span class="input-group-text">Token</span></div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">月费用预警阈值</label>
+              <div class="input-group"><input type="number" class="form-control" value="500"><span class="input-group-text">¥</span></div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">通知方式</label>
+              <div>
+                <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" checked><label class="form-check-label">钉钉机器人</label></div>
+                <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" checked><label class="form-check-label">Webhook</label></div>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary mt-3">保存预警规则</button>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: 统一网关 ============ -->
+      <div class="page" id="page-gateway">
+        <div class="row g-3 mb-3">
+          <div class="col-md-3"><div class="stat-card"><div class="stat-value">8,456</div><div class="stat-label">今日请求</div></div></div>
+          <div class="col-md-3"><div class="stat-card"><div class="stat-value">99.2%</div><div class="stat-label">成功率</div></div></div>
+          <div class="col-md-3"><div class="stat-card"><div class="stat-value">385ms</div><div class="stat-label">平均延迟</div></div></div>
+          <div class="col-md-3"><div class="stat-card"><div class="stat-value">3</div><div class="stat-label">限流触发次数</div></div></div>
+        </div>
+        <div class="mb-3">
+          <ul class="nav nav-tabs">
+            <li class="nav-item"><a class="nav-link active" href="#">路由规则</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">限流策略</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">请求日志</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">审计记录</a></li>
+          </ul>
+        </div>
+        <div class="table-card mb-3">
+          <div class="card-header"><span class="fw-bold">路由规则</span><button class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>添加路由</button></div>
+          <div class="card-body">
+            <table class="table table-hover">
+              <thead><tr><th>路由名称</th><th>路径</th><th>目标模型</th><th>策略</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody>
+                <tr><td>默认 Chat 路由</td><td><code>/v1/chat/completions</code></td><td>DeepSeek-V3</td><td>加权轮询</td><td><span class="status-badge status-online">启用</span></td><td><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></button></td></tr>
+                <tr><td>代码生成路由</td><td><code>/v1/code/complete</code></td><td>GPT-4o</td><td>主备切换</td><td><span class="status-badge status-online">启用</span></td><td><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></button></td></tr>
+                <tr><td>图片生成路由</td><td><code>/v1/images/generate</code></td><td>通义万相</td><td>单点</td><td><span class="status-badge status-pending">● 待启用</span></td><td><button class="btn btn-sm btn-outline-success"><i class="bi bi-play"></i></button></td></tr>
+                <tr><td>Embedding 路由</td><td><code>/v1/embeddings</code></td><td>通义千问</td><td>加权轮询</td><td><span class="status-badge status-online">启用</span></td><td><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="form-card">
+          <h6 class="fw-bold mb-3"><i class="bi bi-speedometer2 me-2"></i>全局限流策略</h6>
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">全局 QPS 上限</label>
+              <input type="number" class="form-control" value="500">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">单 Key QPS 上限</label>
+              <input type="number" class="form-control" value="100">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">并发请求上限</label>
+              <input type="number" class="form-control" value="200">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">限流响应</label>
+              <select class="form-select"><option>429 Too Many Requests</option><option>排队等待</option></select>
+            </div>
+          </div>
+          <button class="btn btn-primary mt-3">保存策略</button>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: 模型对比评估（新增） ============ -->
+      <div class="page" id="page-compare">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="fw-bold m-0">模型对比评估</h6>
+          <div class="d-flex gap-2">
+            <select class="form-select" style="width:160px;">
+              <option>DeepSeek-V3</option><option selected>GPT-4o</option><option>通义千问</option><option>文心一言</option>
+            </select>
+            <select class="form-select" style="width:160px;">
+              <option selected>DeepSeek-V3</option><option>GPT-4o</option><option>通义千问</option><option>文心一言</option>
+            </select>
+            <button class="btn btn-primary"><i class="bi bi-arrow-repeat me-1"></i>对比</button>
+          </div>
+        </div>
+
+        <!-- 综合评分对比 -->
+        <div class="compare-row mb-3">
+          <div class="compare-card winner">
+            <div class="text-muted mb-2" style="font-size:13px;">DeepSeek-V3</div>
+            <div class="model-score" style="color:#52c41a;">92</div>
+            <div style="font-size:13px;color:#8c8c8c;">综合评分</div>
+            <div class="mt-2">
+              <span class="badge bg-success">质量: A</span>
+              <span class="badge bg-primary ms-1">速度: 快</span>
+            </div>
+          </div>
+          <div class="compare-card">
+            <div class="text-muted mb-2" style="font-size:13px;">GPT-4o</div>
+            <div class="model-score" style="color:#1890ff;">88</div>
+            <div style="font-size:13px;color:#8c8c8c;">综合评分</div>
+            <div class="mt-2">
+              <span class="badge bg-success">质量: A</span>
+              <span class="badge bg-warning text-dark ms-1">速度: 中</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 详细对比维度 -->
+        <div class="table-card mb-3">
+          <div class="card-header"><span class="fw-bold">多维度对比</span></div>
+          <div class="card-body">
+            <table class="table">
+              <thead><tr><th>对比维度</th><th>DeepSeek-V3</th><th>GPT-4o</th><th>胜出</th></tr></thead>
+              <tbody>
+                <tr><td>响应质量 (1-10)</td><td><strong>9.2</strong> ⭐</td><td>9.0</td><td><span class="text-success">DeepSeek</span></td></tr>
+                <tr><td>平均延迟 (ms)</td><td><strong>320ms</strong> ⚡</td><td>480ms</td><td><span class="text-success">DeepSeek</span></td></tr>
+                <tr><td>Token 成本 (¥/1K)</td><td><strong>¥0.005</strong> 💰</td><td>¥0.020</td><td><span class="text-success">DeepSeek</span></td></tr>
+                <tr><td>上下文长度</td><td>128K</td><td><strong>128K</strong></td><td><span class="text-muted">持平</span></td></tr>
+                <tr><td>多模态能力</td><td>文本</td><td><strong>文本+图像+音频</strong></td><td><span class="text-primary">GPT-4o</span></td></tr>
+                <tr><td>中文理解</td><td><strong>优秀</strong> ⭐</td><td>良好</td><td><span class="text-success">DeepSeek</span></td></tr>
+                <tr><td>代码生成</td><td>优秀</td><td><strong>优秀</strong> ⭐</td><td><span class="text-muted">持平</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 成本 vs 质量 散点图（Mock） -->
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="form-card">
+              <h6 class="fw-bold mb-3">成本 vs 质量分布</h6>
+              <div style="background:#fafafa;border-radius:8px;padding:20px;min-height:200px;position:relative;">
+                <div style="position:absolute;bottom:20px;left:20px;right:20px;display:flex;justify-content:space-around;">
+                  <div style="text-align:center;padding:10px;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);width:100px;">
+                    <div style="font-size:20px;color:#52c41a;">●</div>
+                    <div style="font-size:12px;">DeepSeek</div>
+                    <div style="font-size:11px;color:#8c8c8c;">高性价比</div>
+                  </div>
+                  <div style="text-align:center;padding:10px;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);width:100px;">
+                    <div style="font-size:20px;color:#1890ff;">●</div>
+                    <div style="font-size:12px;">GPT-4o</div>
+                    <div style="font-size:11px;color:#8c8c8c;">高质量高成本</div>
+                  </div>
+                  <div style="text-align:center;padding:10px;background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);width:100px;">
+                    <div style="font-size:20px;color:#faad14;">●</div>
+                    <div style="font-size:12px;">通义千问</div>
+                    <div style="font-size:11px;color:#8c8c8c;">均衡型</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-card">
+              <h6 class="fw-bold mb-3">推荐建议</h6>
+              <div class="list-group">
+                <div class="list-group-item border-0 px-0">
+                  <div class="d-flex justify-content-between">
+                    <span><strong>日常对话/客服</strong></span>
+                    <span class="text-success">DeepSeek-V3</span>
+                  </div>
+                  <small class="text-muted">性价比最高，中文理解优秀</small>
+                </div>
+                <div class="list-group-item border-0 px-0">
+                  <div class="d-flex justify-content-between">
+                    <span><strong>复杂推理/代码</strong></span>
+                    <span class="text-primary">GPT-4o</span>
+                  </div>
+                  <small class="text-muted">复杂任务处理能力更强</small>
+                </div>
+                <div class="list-group-item border-0 px-0">
+                  <div class="d-flex justify-content-between">
+                    <span><strong>多模态任务</strong></span>
+                    <span class="text-primary">GPT-4o</span>
+                  </div>
+                  <small class="text-muted">支持图像/音频输入</small>
+                </div>
+                <div class="list-group-item border-0 px-0">
+                  <div class="d-flex justify-content-between">
+                    <span><strong>高并发低成本</strong></span>
+                    <span class="text-success">DeepSeek-V3</span>
+                  </div>
+                  <small class="text-muted">延迟低，成本仅为 GPT-4o 的 1/4</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: 模型微调（含数据集管理） ============ -->
+      <div class="page" id="page-finetune">
+        <div class="row g-3 mb-3">
+          <div class="col-md-3"><div class="stat-card"><div class="stat-value">4</div><div class="stat-label">微调任务</div></div></div>
+          <div class="col-md-3"><div class="stat-card"><div class="stat-value">2</div><div class="stat-label">运行中</div></div></div>
+          <div class="col-md-3"><div class="stat-card"><div class="stat-value">12</div><div class="stat-label">数据集</div></div></div>
+          <div class="col-md-3"><div class="stat-card"><div class="stat-value">3</div><div class="stat-label">已部署模型</div></div></div>
+        </div>
+
+        <div class="mb-3">
+          <ul class="nav nav-tabs">
+            <li class="nav-item"><a class="nav-link active" href="javascript:void(0)" onclick="switchFinetuneTab('tasks',this)">微调任务</a></li>
+            <li class="nav-item"><a class="nav-link" href="javascript:void(0)" onclick="switchFinetuneTab('datasets',this)">数据集管理</a></li>
+            <li class="nav-item"><a class="nav-link" href="javascript:void(0)" onclick="switchFinetuneTab('eval',this)">结果评估</a></li>
+          </ul>
+        </div>
+
+        <!-- 微调任务 Tab -->
+        <div id="ft-tasks" class="ft-tab">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div><input type="text" class="form-control" placeholder="搜索任务..." style="width:260px;"></div>
+            <div><button class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>创建微调任务</button></div>
+          </div>
+          <div class="table-card mb-3">
+            <div class="card-body">
+              <table class="table table-hover">
+                <thead><tr><th>任务名称</th><th>基座模型</th><th>数据集</th><th>状态</th><th>进度</th><th>创建时间</th><th>操作</th></tr></thead>
+                <tbody>
+                  <tr><td>客服对话优化</td><td>DeepSeek-V3</td><td>客服对话数据集 (5.6k)</td><td><span class="status-badge status-pending">● 运行中</span></td><td><div class="progress" style="height:6px;width:120px;"><div class="progress-bar" style="width:65%"></div></div> 65%</td><td>2024-12-28</td><td><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i></button></td></tr>
+                  <tr><td>代码生成增强</td><td>GPT-4o</td><td>代码数据集 (3.2k)</td><td><span class="status-badge status-pending">● 运行中</span></td><td><div class="progress" style="height:6px;width:120px;"><div class="progress-bar" style="width:30%;background:#faad14;"></div></div> 30%</td><td>2024-12-30</td><td><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i></button></td></tr>
+                  <tr><td>行业术语适配</td><td>通义千问</td><td>行业术语集 (2.1k)</td><td><span class="status-badge status-online">已完成</span></td><td><div class="progress" style="height:6px;width:120px;"><div class="progress-bar" style="width:100%;background:#52c41a;"></div></div> 100%</td><td>2024-12-20</td><td><button class="btn btn-sm btn-outline-primary"><i class="bi bi-rocket-takeoff"></i> 部署</button></td></tr>
+                  <tr><td>情感分析优化</td><td>DeepSeek-V3</td><td>情感标注数据集 (1.8k)</td><td><span class="status-badge status-offline">失败</span></td><td>-</td><td>2024-12-25</td><td><button class="btn btn-sm btn-outline-danger"><i class="bi bi-exclamation-triangle"></i> 查看日志</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="form-card">
+            <h6 class="fw-bold mb-3"><i class="bi bi-plus-circle me-2"></i>创建微调任务</h6>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">任务名称</label>
+                <input type="text" class="form-control" placeholder="输入任务名称">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">基座模型</label>
+                <select class="form-select"><option>DeepSeek-V3</option><option>GPT-4o</option><option>通义千问</option></select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">训练数据集</label>
+                <select class="form-select"><option>选择数据集...</option><option>客服对话数据集</option><option>代码数据集</option></select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">验证数据集 (可选)</label>
+                <select class="form-select"><option>无</option><option>验证集-1</option></select>
+              </div>
+              <div class="col-md-12">
+                <label class="form-label">超参数配置</label>
+                <div class="row g-2">
+                  <div class="col-md-3"><input type="number" class="form-control" value="3" placeholder="Epochs"><small class="text-muted">训练轮数</small></div>
+                  <div class="col-md-3"><input type="number" class="form-control" value="2e-5" placeholder="Learning Rate"><small class="text-muted">学习率</small></div>
+                  <div class="col-md-3"><input type="number" class="form-control" value="8" placeholder="Batch Size"><small class="text-muted">批次大小</small></div>
+                  <div class="col-md-3"><input type="number" class="form-control" value="4096" placeholder="Max Length"><small class="text-muted">最大序列长度</small></div>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary mt-3"><i class="bi bi-play-circle me-1"></i>开始训练</button>
+          </div>
+        </div>
+
+        <!-- 数据集管理 Tab（新增详情） -->
+        <div id="ft-datasets" class="ft-tab" style="display:none;">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div><input type="text" class="form-control" placeholder="搜索数据集..." style="width:260px;"></div>
+            <div><button class="btn btn-primary"><i class="bi bi-upload me-1"></i>上传数据集</button></div>
+          </div>
+          <div class="table-card mb-3">
+            <div class="card-body">
+              <table class="table table-hover">
+                <thead><tr><th>数据集名称</th><th>格式</th><th>样本数</th><th>标注状态</th><th>版本</th><th>创建时间</th><th>操作</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><strong>客服对话数据集</strong></td><td>JSONL</td><td>5,600</td>
+                    <td><span class="status-badge status-online">已标注</span></td><td>v2.1</td><td>2024-12-15</td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-eye"></i></button>
+                      <button class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i> 标注</button>
+                      <button class="btn btn-sm btn-outline-danger"><i class="bi bi-download"></i></button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><strong>代码数据集</strong></td><td>JSONL</td><td>3,200</td>
+                    <td><span class="status-badge status-pending">● 标注中</span></td><td>v1.3</td><td>2024-12-20</td>
+                    <td><button class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-eye"></i></button><button class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i> 标注</button><button class="btn btn-sm btn-outline-danger"><i class="bi bi-download"></i></button></td>
+                  </tr>
+                  <tr>
+                    <td><strong>行业术语集</strong></td><td>CSV</td><td>2,100</td>
+                    <td><span class="status-badge status-online">已标注</span></td><td>v1.0</td><td>2024-12-10</td>
+                    <td><button class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-eye"></i></button><button class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i> 标注</button><button class="btn btn-sm btn-outline-danger"><i class="bi bi-download"></i></button></td>
+                  </tr>
+                  <tr>
+                    <td><strong>情感标注数据集</strong></td><td>JSONL</td><td>1,800</td>
+                    <td><span class="status-badge status-warning">● 待审核</span></td><td>v1.0</td><td>2024-12-22</td>
+                    <td><button class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-eye"></i></button><button class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-pencil"></i> 标注</button><button class="btn btn-sm btn-outline-danger"><i class="bi bi-download"></i></button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <!-- 数据集详情预览 -->
+          <div class="form-card">
+            <h6 class="fw-bold mb-3"><i class="bi bi-upload me-2"></i>上传新数据集</h6>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">数据集名称</label>
+                <input type="text" class="form-control" placeholder="输入名称">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">数据格式</label>
+                <select class="form-select"><option>JSONL</option><option>CSV</option><option>JSON</option><option>Parquet</option></select>
+              </div>
+              <div class="col-md-12">
+                <label class="form-label">上传文件</label>
+                <div style="border:2px dashed #d9d9d9;border-radius:8px;padding:40px;text-align:center;background:#fafafa;">
+                  <i class="bi bi-cloud-upload" style="font-size:32px;color:#1890ff;"></i>
+                  <p class="mt-2 text-muted">拖拽文件到此处，或点击选择文件</p>
+                  <p class="text-muted" style="font-size:12px;">支持 JSONL / CSV / JSON 格式，单文件最大 500MB</p>
+                </div>
+              </div>
+              <div class="col-md-12">
+                <label class="form-label">数据预览</label>
+                <div style="background:#1e1e1e;color:#d4d4d4;border-radius:8px;padding:12px;font-size:12px;font-family:monospace;max-height:150px;overflow-y:auto;">
+                  <div>{"messages": [{"role": "system", "content": "你是一个智能客服助手"}, {"role": "user", "content": "如何退货？"}, {"role": "assistant", "content": "您好，退货流程如下：..."}]}</div>
+                  <div style="color:#8c8c8c;">{"messages": [{"role": "system", "content": "你是一个智能客服助手"}, {"role": "user", "content": "订单状态查询"}, {"role": "assistant", "content": "您的订单目前处于..."}]}</div>
+                  <div style="color:#8c8c8c;">{"messages": [{"role": "system", "content": "你是一个智能客服助手"}, ...</div>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary mt-3"><i class="bi bi-cloud-upload me-1"></i>开始上传</button>
+          </div>
+        </div>
+
+        <!-- 结果评估 Tab -->
+        <div id="ft-eval" class="ft-tab" style="display:none;">
+          <div class="table-card">
+            <div class="card-header"><span class="fw-bold">微调结果对比</span></div>
+            <div class="card-body">
+              <table class="table table-hover">
+                <thead><tr><th>评估指标</th><th>行业术语适配 (微调前)</th><th>行业术语适配 (微调后)</th><th>提升</th></tr></thead>
+                <tbody>
+                  <tr><td>准确率 (Accuracy)</td><td>82.5%</td><td><strong>94.2%</strong></td><td><span class="text-success">+11.7%</span></td></tr>
+                  <tr><td>BLEU 分数</td><td>0.68</td><td><strong>0.85</strong></td><td><span class="text-success">+0.17</span></td></tr>
+                  <tr><td>ROUGE-L</td><td>0.72</td><td><strong>0.88</strong></td><td><span class="text-success">+0.16</span></td></tr>
+                  <tr><td>推理延迟</td><td>320ms</td><td>340ms</td><td><span class="text-warning">+20ms (可接受)</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ PAGE: 系统配置（钉钉通知 + SSO） ============ -->
+      <div class="page" id="page-settings">
+        <div class="form-card mb-3">
+          <h6 class="fw-bold mb-3"><i class="bi bi-shield-check me-2"></i>认证与安全</h6>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">认证方式</label>
+              <div class="d-flex align-items-center gap-3">
+                <span class="tag-dingtalk"><i class="bi bi-shield-lock me-1"></i>SSO 统一认证</span>
+                <span class="text-muted" style="font-size:13px;">已对接公司 SSO</span>
+              </div>
+              <small class="text-muted">用户管理由公司 SSO 统一管理，本平台不维护独立用户体系</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">JWT 密钥</label>
+              <input type="password" class="form-control" value="-----BEGIN RSA PRIVATE KEY-----">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-card mb-3">
+          <h6 class="fw-bold mb-3"><i class="bi bi-chat-dots me-2"></i>钉钉通知配置</h6>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">钉钉机器人 Webhook URL</label>
+              <input type="text" class="form-control" value="https://oapi.dingtalk.com/robot/send?access_token=xxxxxxxx">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">加签密钥 (可选)</label>
+              <input type="text" class="form-control" placeholder="SECxxxxxxxxxxxxxxxxxxxx">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">@指定手机号 (可选)</label>
+              <input type="text" class="form-control" placeholder="13800138000, 13900139000">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">@所有人</label>
+              <select class="form-select"><option>否</option><option>是</option></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">通知事件</label>
+              <div>
+                <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" checked><label class="form-check-label">Token 预警</label></div>
+                <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" checked><label class="form-check-label">模型异常</label></div>
+                <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox"><label class="form-check-label">微调完成</label></div>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary mt-3">测试推送</button>
+        </div>
+
+        <div class="form-card mb-3">
+          <h6 class="fw-bold mb-3"><i class="bi bi-clock me-2"></i>操作日志</h6>
+          <div class="d-flex justify-content-between mb-3">
+            <div class="d-flex gap-2">
+              <input type="text" class="form-control" placeholder="搜索操作..." style="width:200px;">
+              <select class="form-select" style="width:120px;">
+                <option>全部类型</option><option>Key 管理</option><option>模型配置</option><option>系统设置</option>
+              </select>
+            </div>
+            <button class="btn btn-outline-secondary"><i class="bi bi-download me-1"></i>导出日志</button>
+          </div>
+          <div class="table-responsive" style="max-height:300px;">
+            <table class="table table-sm">
+              <thead><tr><th>时间</th><th>用户</th><th>操作</th><th>IP</th><th>详情</th></tr></thead>
+              <tbody>
+                <tr><td>2024-12-31 14:30</td><td>admin</td><td>创建 API Key</td><td>192.168.1.100</td><td>为智能客服创建新 Key</td></tr>
+                <tr><td>2024-12-31 14:25</td><td>admin</td><td>更新模型配置</td><td>192.168.1.100</td><td>修改 DeepSeek QPS 限制</td></tr>
+                <tr><td>2024-12-31 13:20</td><td>zhangsan</td><td>查看 Token 统计</td><td>192.168.1.101</td><td>导出月度报表</td></tr>
+                <tr><td>2024-12-31 12:00</td><td>system</td><td>触发预警</td><td>-</td><td>Token 用量超过阈值的 80%</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="proto-badge"><i class="bi bi-tools me-1"></i> 原型 v2 — 已按修改意见更新</div>
+
+<script>
+const pageTitles = {
+  dashboard: '总览大屏',
+  models: '模型管理',
+  keys: 'Key 管理',
+  tokens: 'Token 统计',
+  gateway: '统一网关',
+  compare: '模型对比评估',
+  finetune: '模型微调',
+  settings: '系统配置'
+};
+
+function switchPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
+  document.getElementById('pageTitle').textContent = pageTitles[page] || page;
+}
+
+function switchFinetuneTab(tab, el) {
+  document.querySelectorAll('.ft-tab').forEach(t => t.style.display = 'none');
+  document.getElementById('ft-' + tab).style.display = 'block';
+  document.querySelectorAll('#page-finetune .nav-tabs .nav-link').forEach(l => l.classList.remove('active'));
+  el.classList.add('active');
+}
+</script>
+</body>
+</html>

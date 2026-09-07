@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+*.db
+
+# Node
+node_modules/
+dist/
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Build outputs
+backend/alembic/versions/*.pyc
+coverage/
+htmlcov/
+.pytest_cache/
+
+# Logs
+*.log
+logs/
