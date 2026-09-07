@@ -45,6 +45,26 @@ def _usage_from_body(body: dict) -> dict:
     }
 
 
+@router.get("/v1/models")
+async def list_models_openai(db: AsyncSession = Depends(get_db)):
+    """OpenAI 兼容模型列表（供 Dify/CherryStudio 等客户端拉取/校验连通性）。"""
+    import time
+    svc = ProxyService(db)
+    models = await svc.list_online_models()
+    return {
+        "object": "list",
+        "data": [
+            {
+                "id": m.name,
+                "object": "model",
+                "created": int(time.time()),
+                "owned_by": "ai-gateway-platform",
+            }
+            for m in models
+        ],
+    }
+
+
 @router.post("/v1/chat/completions")
 async def chat_completions(request: Request, db: AsyncSession = Depends(get_db)):
     svc = ProxyService(db)

@@ -68,6 +68,16 @@ class ProxyService:
         )
         return result.scalar_one_or_none()
 
+    async def list_online_models(self) -> list[Model]:
+        """列出全部在线模型（供 OpenAI 兼容 /v1/models 端点）。"""
+        result = await self.db.execute(
+            select(Model).where(
+                Model.deleted_at.is_(None),
+                Model.status == "online",
+            ).order_by(Model.created_at)
+        )
+        return list(result.scalars().all())
+
     async def key_can_access_model(self, key_id: int, model_id: int) -> bool:
         """Key 是否有权访问该模型：未绑定任何模型 = 全部放行；绑定了则须包含。"""
         result = await self.db.execute(
