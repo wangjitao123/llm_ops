@@ -1,46 +1,49 @@
 <template>
   <div class="page-container">
-    <div class="table-toolbar">
-      <a-space>
-        <a-select v-model:value="query.status" placeholder="状态" allow-clear style="width: 120px">
-          <a-select-option value="enabled">启用</a-select-option>
-          <a-select-option value="disabled">停用</a-select-option>
-        </a-select>
-        <a-button type="primary" @click="loadRoutes">查询</a-button>
-      </a-space>
-      <a-button type="primary" @click="openCreateModal">
-        <template #icon><PlusOutlined /></template>
-        新建路由
-      </a-button>
+    <div class="page-title-row">
+      <h3>统一网关</h3>
+      <p>路由规则管理与模型分发配置</p>
     </div>
+    <div class="panel-card">
+      <div class="table-toolbar">
+        <a-space>
+          <a-select v-model:value="query.status" placeholder="状态" allow-clear style="width: 120px">
+            <a-select-option value="enabled">启用</a-select-option>
+            <a-select-option value="disabled">停用</a-select-option>
+          </a-select>
+          <a-button type="primary" @click="loadRoutes">查询</a-button>
+        </a-space>
+        <a-button type="primary" @click="openCreateModal">
+          <template #icon><PlusOutlined /></template>
+          新建路由
+        </a-button>
+      </div>
 
-    <a-table :data-source="routes" :loading="loading" row-key="id" :pagination="false">
-      <a-table-column title="规则名称" data-index="name" key="name" width="150" />
-      <a-table-column title="路径匹配" key="path" width="200">
-        <template #default="{ record }">
-          <code>{{ record.match_type }}: {{ record.path_pattern }}</code>
-        </template>
-      </a-table-column>
-      <a-table-column title="路由策略" key="strategy" width="100">
-        <template #default="{ text }">{{ strategyText(text) }}</template>
-      </a-table-column>
-      <a-table-column title="目标模型" key="targets">
-        <template #default="{ record }">
-          <a-space wrap>
-            <a-tag v-for="t in getModelTargets(record)" :key="t.model_id" color="blue">
-              {{ getModelName(t.model_id) }} ({{ record.strategy === 'weighted' ? `权重 ${t.weight}` : `优先级 ${t.priority || 0}` }})
-            </a-tag>
-            <span v-if="!record.model_targets?.length">-</span>
-          </a-space>
-        </template>
-      </a-table-column>
-      <a-table-column title="状态" key="status" width="90">
-        <template #default="{ record }">
-          <a-tag :color="record.status === 'enabled' ? 'success' : 'default'">
-            {{ record.status === 'enabled' ? '启用' : '停用' }}
-          </a-tag>
-        </template>
-      </a-table-column>
+      <a-table :data-source="routes" :loading="loading" row-key="id" :pagination="false">
+        <a-table-column title="规则名称" data-index="name" key="name" width="150" />
+        <a-table-column title="路径匹配" key="path" width="200">
+          <template #default="{ record }">
+            <code>{{ record.match_type }}: {{ record.path_pattern }}</code>
+          </template>
+        </a-table-column>
+        <a-table-column title="路由策略" key="strategy" width="100">
+          <template #default="{ text }">{{ strategyText(text) }}</template>
+        </a-table-column>
+        <a-table-column title="目标模型" key="targets">
+          <template #default="{ record }">
+            <a-space wrap>
+              <a-tag v-for="t in getModelTargets(record)" :key="t.model_id" color="blue">
+                {{ getModelName(t.model_id) }} ({{ record.strategy === 'weighted' ? `权重 ${t.weight}` : `优先级 ${t.priority || 0}` }})
+              </a-tag>
+              <span v-if="!record.model_targets?.length">-</span>
+            </a-space>
+          </template>
+        </a-table-column>
+        <a-table-column title="状态" key="status" width="90">
+          <template #default="{ record }">
+            <StatusTag :status="record.status" />
+          </template>
+        </a-table-column>
       <a-table-column title="操作" key="action" width="240">
         <template #default="{ record }">
           <a-space>
@@ -56,6 +59,7 @@
         </template>
       </a-table-column>
     </a-table>
+    </div>
 
     <a-modal v-model:open="modalOpen" :title="editing ? '编辑路由' : '新建路由'" :confirm-loading="saving" @ok="handleSubmit" width="700px">
       <a-form :model="form" layout="vertical">
@@ -127,6 +131,7 @@
 import { ref, onMounted, reactive, computed } from 'vue'
 import { message } from 'ant-design-vue'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
+import StatusTag from '@/components/common/StatusTag.vue'
 import { getRouteList, createRoute, updateRoute, deleteRoute, syncRouteToHigress } from '@/api/gatewayApi'
 import { getModelList } from '@/api/modelApi'
 import type { RouteRuleItem, ModelItem } from '@/types/api'

@@ -1,61 +1,70 @@
 <template>
   <div class="page-container">
-    <div class="table-toolbar">
-      <a-space>
-        <a-select v-model:value="query.status" placeholder="状态" allow-clear style="width: 120px">
-          <a-select-option value="active">启用</a-select-option>
-          <a-select-option value="disabled">禁用</a-select-option>
-          <a-select-option value="expired">过期</a-select-option>
-        </a-select>
-        <a-button type="primary" @click="loadKeys">
-          <template #icon><SearchOutlined /></template>
-          查询
-        </a-button>
-      </a-space>
-      <a-space>
-        <a-button @click="openAppModal">应用管理</a-button>
-        <a-button type="primary" @click="openCreateModal">
-          <template #icon><PlusOutlined /></template>
-          新建 Key
-        </a-button>
-      </a-space>
-    </div>
+    <div class="panel-card">
+      <div class="table-toolbar">
+        <div class="toolbar-filters">
+          <a-select v-model:value="query.status" placeholder="状态" allow-clear style="width: 120px">
+            <a-select-option value="active">启用</a-select-option>
+            <a-select-option value="disabled">禁用</a-select-option>
+            <a-select-option value="expired">过期</a-select-option>
+          </a-select>
+          <a-button type="primary" @click="loadKeys">
+            <template #icon><SearchOutlined /></template>
+            查询
+          </a-button>
+        </div>
+        <div class="toolbar-actions">
+          <a-button @click="openAppModal">应用管理</a-button>
+          <a-button type="primary" @click="openCreateModal">
+            <template #icon><PlusOutlined /></template>
+            新建 Key
+          </a-button>
+        </div>
+      </div>
 
-    <a-table :data-source="keys" :loading="loading" row-key="id" :pagination="false">
-      <a-table-column title="Key 名称" data-index="name" key="name" />
-      <a-table-column title="Key" key="key_prefix" width="140">
-        <template #default="{ record }">
-          <span>{{ record.key_prefix }}****</span>
-        </template>
-      </a-table-column>
-      <a-table-column title="状态" key="status" width="90">
-        <template #default="{ record }">
-          <a-tag :color="keyStatusColor(record.status)">{{ keyStatusText(record.status) }}</a-tag>
-        </template>
-      </a-table-column>
-      <a-table-column title="QPS 限制" data-index="qps_limit" key="qps_limit" width="90">
-        <template #default="{ text }">{{ text || '全局' }}</template>
-      </a-table-column>
-      <a-table-column title="Token 配额" key="token_quota" width="100">
-        <template #default="{ record }">{{ record.token_quota ? formatTokenCount(record.token_quota) : '不限' }}</template>
-      </a-table-column>
-      <a-table-column title="过期时间" data-index="expires_at" key="expires_at" width="160">
-        <template #default="{ text }">{{ text ? formatTime(text) : '永久' }}</template>
-      </a-table-column>
-      <a-table-column title="操作" key="action" width="220">
-        <template #default="{ record }">
-          <a-space>
-            <a-button type="link" size="small" @click="openEditModal(record)">编辑</a-button>
-            <a-button type="link" size="small" @click="toggleStatus(record)">
-              {{ record.status === 'active' ? '禁用' : '启用' }}
-            </a-button>
-            <a-popconfirm title="确定回收该 Key？" @confirm="handleDelete(record)">
-              <a-button type="link" danger size="small">回收</a-button>
-            </a-popconfirm>
-          </a-space>
-        </template>
-      </a-table-column>
-    </a-table>
+      <a-table :data-source="keys" :loading="loading" row-key="id" :pagination="false">
+        <a-table-column title="Key 名称" data-index="name" key="name">
+          <template #default="{ record }">
+            <a-space>
+              <a-avatar size="small" style="background: #f6ffed; color: #52c41a; font-size: 13px">K</a-avatar>
+              <span style="font-weight: 500">{{ record.name }}</span>
+            </a-space>
+          </template>
+        </a-table-column>
+        <a-table-column title="Key" key="key_prefix" width="150">
+          <template #default="{ record }">
+            <code style="background:#fafafa;padding:2px 8px;border-radius:4px">{{ record.key_prefix }}••••</code>
+          </template>
+        </a-table-column>
+        <a-table-column title="状态" key="status" width="100">
+          <template #default="{ record }">
+            <StatusTag :status="record.status" />
+          </template>
+        </a-table-column>
+        <a-table-column title="QPS 限制" data-index="qps_limit" key="qps_limit" width="90">
+          <template #default="{ text }">{{ text || '全局' }}</template>
+        </a-table-column>
+        <a-table-column title="Token 配额" key="token_quota" width="110">
+          <template #default="{ record }">{{ record.token_quota ? formatTokenCount(record.token_quota) : '不限' }}</template>
+        </a-table-column>
+        <a-table-column title="过期时间" data-index="expires_at" key="expires_at" width="150">
+          <template #default="{ text }">{{ text ? formatTime(text) : '永久' }}</template>
+        </a-table-column>
+        <a-table-column title="操作" key="action" width="220">
+          <template #default="{ record }">
+            <a-space>
+              <a-button type="link" size="small" @click="openEditModal(record)">编辑</a-button>
+              <a-button type="link" size="small" @click="toggleStatus(record)">
+                {{ record.status === 'active' ? '禁用' : '启用' }}
+              </a-button>
+              <a-popconfirm title="确定回收该 Key？" @confirm="handleDelete(record)">
+                <a-button type="link" danger size="small">回收</a-button>
+              </a-popconfirm>
+            </a-space>
+          </template>
+        </a-table-column>
+      </a-table>
+    </div>
 
     <a-modal v-model:open="modalOpen" :title="editing ? '编辑 Key' : '新建 API Key'" :confirm-loading="saving" @ok="handleSubmit" width="600px">
       <a-form ref="formRef" :model="form" layout="vertical">
@@ -128,6 +137,7 @@ import { PlusOutlined, SearchOutlined, CopyOutlined } from '@ant-design/icons-vu
 import { getKeyList, createKey, updateKey, deleteKey, getApplicationList, createApplication } from '@/api/keyApi'
 import { getModelList } from '@/api/modelApi'
 import type { KeyItem, ApplicationItem, ModelItem } from '@/types/api'
+import StatusTag from '@/components/common/StatusTag.vue'
 import { formatTime, formatTokenCount } from '@/utils'
 
 const keys = ref<KeyItem[]>([])
@@ -155,16 +165,6 @@ const form = reactive({
 })
 
 const modelOptions = computed(() => models.value.map((m) => ({ label: `${m.name} (${m.provider})`, value: m.id })))
-
-const keyStatusMap: Record<string, { text: string; color: string }> = {
-  active: { text: '启用', color: 'success' },
-  disabled: { text: '禁用', color: 'default' },
-  expired: { text: '过期', color: 'warning' },
-  revoked: { text: '已回收', color: 'error' }
-}
-
-function keyStatusColor(status: string) { return keyStatusMap[status]?.color || 'default' }
-function keyStatusText(status: string) { return keyStatusMap[status]?.text || status }
 
 async function loadKeys() {
   loading.value = true

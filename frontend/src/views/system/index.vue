@@ -3,66 +3,73 @@
     <a-tabs v-model:activeKey="activeTab">
       <!-- SSO 配置 -->
       <a-tab-pane key="sso" tab="SSO 认证配置">
-        <a-card title="SSO 配置" style="max-width: 720px">
-          <a-form :model="ssoForm" layout="vertical">
-            <a-form-item label="认证协议" required>
-              <a-select v-model:value="ssoForm['sso.protocol']">
-                <a-select-option value="oauth2">OAuth 2.0</a-select-option>
-                <a-select-option value="saml">SAML 2.0</a-select-option>
-                <a-select-option value="ldap">LDAP</a-select-option>
-                <a-select-option value="cas">CAS</a-select-option>
-              </a-select>
-            </a-form-item>
-            <a-form-item label="授权地址 (Authorize URL)">
-              <a-input v-model:value="ssoForm['sso.authorize_url']" placeholder="https://sso.company.com/oauth2/authorize" />
-            </a-form-item>
-            <a-form-item label="Token 地址 (Token URL)">
-              <a-input v-model:value="ssoForm['sso.token_url']" placeholder="https://sso.company.com/oauth2/token" />
-            </a-form-item>
-            <a-row :gutter="16">
-              <a-col :span="12">
-                <a-form-item label="Client ID">
-                  <a-input v-model:value="ssoForm['sso.client_id']" />
-                </a-form-item>
-              </a-col>
-              <a-col :span="12">
-                <a-form-item label="Client Secret">
-                  <a-input-password v-model:value="ssoForm['sso.client_secret']" />
-                </a-form-item>
-              </a-col>
-            </a-row>
-            <a-form-item label="回调地址 (Redirect URI)">
-              <a-input v-model:value="ssoForm['sso.redirect_uri']" placeholder="https://ai-gateway.company.com/auth/callback" />
-            </a-form-item>
-            <a-button type="primary" :loading="savingSso" @click="saveSsoConfig">保存配置</a-button>
-          </a-form>
-        </a-card>
+        <div class="panel-card" style="max-width: 720px">
+          <div class="panel-header">
+            <span class="panel-title">SSO 配置</span>
+          </div>
+          <div class="panel-body">
+            <a-form :model="ssoForm" layout="vertical">
+              <a-form-item label="认证协议" required>
+                <a-select v-model:value="ssoForm['sso.protocol']">
+                  <a-select-option value="oauth2">OAuth 2.0</a-select-option>
+                  <a-select-option value="saml">SAML 2.0</a-select-option>
+                  <a-select-option value="ldap">LDAP</a-select-option>
+                  <a-select-option value="cas">CAS</a-select-option>
+                </a-select>
+              </a-form-item>
+              <a-form-item label="授权地址 (Authorize URL)">
+                <a-input v-model:value="ssoForm['sso.authorize_url']" placeholder="https://sso.company.com/oauth2/authorize" />
+              </a-form-item>
+              <a-form-item label="Token 地址 (Token URL)">
+                <a-input v-model:value="ssoForm['sso.token_url']" placeholder="https://sso.company.com/oauth2/token" />
+              </a-form-item>
+              <a-row :gutter="16">
+                <a-col :span="12">
+                  <a-form-item label="Client ID">
+                    <a-input v-model:value="ssoForm['sso.client_id']" />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="12">
+                  <a-form-item label="Client Secret">
+                    <a-input-password v-model:value="ssoForm['sso.client_secret']" />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+              <a-form-item label="回调地址 (Redirect URI)">
+                <a-input v-model:value="ssoForm['sso.redirect_uri']" placeholder="https://ai-gateway.company.com/auth/callback" />
+              </a-form-item>
+              <a-button type="primary" :loading="savingSso" @click="saveSsoConfig">保存配置</a-button>
+            </a-form>
+          </div>
+        </div>
       </a-tab-pane>
 
       <!-- 预警规则 -->
       <a-tab-pane key="alerts" tab="用量预警">
-        <div class="table-toolbar">
-          <div></div>
-          <a-button type="primary" @click="openAlertModal">
-            <template #icon><PlusOutlined /></template>
-            新建预警规则
-          </a-button>
+        <div class="panel-card">
+          <div class="table-toolbar">
+            <div></div>
+            <a-button type="primary" @click="openAlertModal">
+              <template #icon><PlusOutlined /></template>
+              新建预警规则
+            </a-button>
+          </div>
+          <a-table :data-source="alertRules" :loading="alertLoading" row-key="id" :pagination="false">
+            <a-table-column title="规则名称" data-index="name" key="name" />
+            <a-table-column title="指标类型" key="metric_type" width="140">
+              <template #default="{ text }">{{ metricTypeText(text) }}</template>
+            </a-table-column>
+            <a-table-column title="阈值" data-index="threshold_value" key="threshold" width="150">
+              <template #default="{ record }">{{ formatThreshold(record) }}</template>
+            </a-table-column>
+            <a-table-column title="状态" key="enabled" width="80">
+              <template #default="{ record }">
+                <StatusTag :status="record.enabled ? 'enabled' : 'disabled'" />
+              </template>
+            </a-table-column>
+            <a-table-column title="创建时间" data-index="created_at" key="created_at" width="170" />
+          </a-table>
         </div>
-        <a-table :data-source="alertRules" :loading="alertLoading" row-key="id" :pagination="false">
-          <a-table-column title="规则名称" data-index="name" key="name" />
-          <a-table-column title="指标类型" key="metric_type" width="140">
-            <template #default="{ text }">{{ metricTypeText(text) }}</template>
-          </a-table-column>
-          <a-table-column title="阈值" data-index="threshold_value" key="threshold" width="150">
-            <template #default="{ record }">{{ formatThreshold(record) }}</template>
-          </a-table-column>
-          <a-table-column title="状态" key="enabled" width="80">
-            <template #default="{ record }">
-              <a-tag :color="record.enabled ? 'success' : 'default'">{{ record.enabled ? '启用' : '停用' }}</a-tag>
-            </template>
-          </a-table-column>
-          <a-table-column title="创建时间" data-index="created_at" key="created_at" width="170" />
-        </a-table>
 
         <a-modal v-model:open="alertModalOpen" title="新建预警规则" :confirm-loading="alertSaving" @ok="handleCreateAlert">
           <a-form :model="alertForm" layout="vertical">
@@ -89,25 +96,27 @@
 
       <!-- 审计日志 -->
       <a-tab-pane key="audit" tab="操作审计">
-        <a-table :data-source="auditLogs" :loading="auditLoading" row-key="id" :pagination="{ pageSize: 20 }">
-          <a-table-column title="用户" data-index="user_id" key="user" width="130" />
-          <a-table-column title="操作类型" key="action_type" width="130">
-            <template #default="{ text }"><a-tag color="blue">{{ text }}</a-tag></template>
-          </a-table-column>
-          <a-table-column title="操作详情" data-index="action_detail" key="detail" ellipsis />
-          <a-table-column title="对象" key="target" width="160">
-            <template #default="{ record }">{{ record.target_type ? `${record.target_type}#${record.target_id}` : '-' }}</template>
-          </a-table-column>
-          <a-table-column title="IP" data-index="client_ip" key="ip" width="130">
-            <template #default="{ text }">{{ text || '-' }}</template>
-          </a-table-column>
-          <a-table-column title="结果" key="result" width="80">
-            <template #default="{ text }">
-              <a-tag :color="text === 'success' ? 'success' : 'error'">{{ text }}</a-tag>
-            </template>
-          </a-table-column>
-          <a-table-column title="时间" data-index="created_at" key="created_at" width="170" />
-        </a-table>
+        <div class="panel-card">
+          <a-table :data-source="auditLogs" :loading="auditLoading" row-key="id" :pagination="{ pageSize: 20 }">
+            <a-table-column title="用户" data-index="user_id" key="user" width="130" />
+            <a-table-column title="操作类型" key="action_type" width="130">
+              <template #default="{ text }"><a-tag color="blue">{{ text }}</a-tag></template>
+            </a-table-column>
+            <a-table-column title="操作详情" data-index="action_detail" key="detail" ellipsis />
+            <a-table-column title="对象" key="target" width="160">
+              <template #default="{ record }">{{ record.target_type ? `${record.target_type}#${record.target_id}` : '-' }}</template>
+            </a-table-column>
+            <a-table-column title="IP" data-index="client_ip" key="ip" width="130">
+              <template #default="{ text }">{{ text || '-' }}</template>
+            </a-table-column>
+            <a-table-column title="结果" key="result" width="80">
+              <template #default="{ text }">
+                <StatusTag :status="text" :custom-text="{success:'成功',failure:'失败'}" />
+              </template>
+            </a-table-column>
+            <a-table-column title="时间" data-index="created_at" key="created_at" width="170" />
+          </a-table>
+        </div>
       </a-tab-pane>
     </a-tabs>
   </div>
@@ -116,6 +125,7 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive } from 'vue'
 import { message } from 'ant-design-vue'
+import StatusTag from '@/components/common/StatusTag.vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import {
   getSystemConfigs, setSystemConfig,

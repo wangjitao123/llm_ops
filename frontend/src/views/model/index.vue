@@ -1,56 +1,69 @@
 <template>
   <div class="page-container">
-    <div class="table-toolbar">
-      <a-space>
-        <a-select v-model:value="query.provider" placeholder="提供商" allow-clear style="width: 140px">
-          <a-select-option v-for="p in providers" :key="p" :value="p">{{ p }}</a-select-option>
-        </a-select>
-        <a-select v-model:value="query.status" placeholder="状态" allow-clear style="width: 120px">
-          <a-select-option value="online">在线</a-select-option>
-          <a-select-option value="offline">离线</a-select-option>
-          <a-select-option value="high_latency">高延迟</a-select-option>
-        </a-select>
-        <a-button type="primary" @click="loadModels">
-          <template #icon><SearchOutlined /></template>
-          查询
-        </a-button>
-      </a-space>
-      <a-button type="primary" @click="openCreateModal">
-        <template #icon><PlusOutlined /></template>
-        添加模型
-      </a-button>
-    </div>
+    <div class="panel-card">
+      <div class="table-toolbar">
+        <div class="toolbar-filters">
+          <a-select v-model:value="query.provider" placeholder="提供商" allow-clear style="width: 140px">
+            <a-select-option v-for="p in providers" :key="p" :value="p">{{ p }}</a-select-option>
+          </a-select>
+          <a-select v-model:value="query.status" placeholder="状态" allow-clear style="width: 120px">
+            <a-select-option value="online">在线</a-select-option>
+            <a-select-option value="offline">离线</a-select-option>
+            <a-select-option value="high_latency">高延迟</a-select-option>
+          </a-select>
+          <a-button type="primary" @click="loadModels">
+            <template #icon><SearchOutlined /></template>
+            查询
+          </a-button>
+        </div>
+        <div class="toolbar-actions">
+          <a-button type="primary" @click="openCreateModal">
+            <template #icon><PlusOutlined /></template>
+            添加模型
+          </a-button>
+        </div>
+      </div>
 
-    <a-table :data-source="models" :loading="loading" row-key="id" :pagination="false">
-      <a-table-column title="模型名称" data-index="name" key="name" />
-      <a-table-column title="提供商" data-index="provider" key="provider">
-        <template #default="{ text }">
-          <a-tag color="blue">{{ text }}</a-tag>
-        </template>
-      </a-table-column>
-      <a-table-column title="版本" data-index="version" key="version" width="80" />
-      <a-table-column title="QPS 限制" data-index="qps_limit" key="qps_limit" width="100" />
-      <a-table-column title="状态" key="status" width="100">
-        <template #default="{ record }">
-          <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
-        </template>
-      </a-table-column>
-      <a-table-column title="API 地址" data-index="api_base_url" key="api_base_url" ellipsis />
-      <a-table-column title="操作" key="action" width="260">
-        <template #default="{ record }">
-          <a-space>
-            <a-button type="link" size="small" @click="openEditModal(record)">编辑</a-button>
-            <a-button type="link" size="small" @click="toggleStatus(record)">
-              {{ record.status === 'online' ? '停用' : '启用' }}
-            </a-button>
-            <a-button type="link" size="small" @click="showVersions(record)">版本</a-button>
-            <a-popconfirm title="确定删除该模型？" ok-text="删除" cancel-text="取消" @confirm="handleDelete(record)">
-              <a-button type="link" danger size="small">删除</a-button>
-            </a-popconfirm>
-          </a-space>
-        </template>
-      </a-table-column>
-    </a-table>
+      <a-table :data-source="models" :loading="loading" row-key="id" :pagination="false">
+        <a-table-column title="模型名称" data-index="name" key="name">
+          <template #default="{ record }">
+            <a-space>
+              <a-avatar size="small" style="background: #e6f7ff; color: #1890ff; font-size: 13px">
+                {{ (record.provider || '?')[0].toUpperCase() }}
+              </a-avatar>
+              <span style="font-weight: 500">{{ record.name }}</span>
+            </a-space>
+          </template>
+        </a-table-column>
+        <a-table-column title="提供商" data-index="provider" key="provider">
+          <template #default="{ text }">
+            <a-tag color="blue">{{ text }}</a-tag>
+          </template>
+        </a-table-column>
+        <a-table-column title="版本" data-index="version" key="version" width="80" />
+        <a-table-column title="QPS 限制" data-index="qps_limit" key="qps_limit" width="100" />
+        <a-table-column title="状态" key="status" width="110">
+          <template #default="{ record }">
+            <StatusTag :status="record.status" />
+          </template>
+        </a-table-column>
+        <a-table-column title="API 地址" data-index="api_base_url" key="api_base_url" ellipsis />
+        <a-table-column title="操作" key="action" width="260">
+          <template #default="{ record }">
+            <a-space>
+              <a-button type="link" size="small" @click="openEditModal(record)">编辑</a-button>
+              <a-button type="link" size="small" @click="toggleStatus(record)">
+                {{ record.status === 'online' ? '停用' : '启用' }}
+              </a-button>
+              <a-button type="link" size="small" @click="showVersions(record)">版本</a-button>
+              <a-popconfirm title="确定删除该模型？" ok-text="删除" cancel-text="取消" @confirm="handleDelete(record)">
+                <a-button type="link" danger size="small">删除</a-button>
+              </a-popconfirm>
+            </a-space>
+          </template>
+        </a-table-column>
+      </a-table>
+    </div>
 
     <a-modal v-model:open="modalOpen" :title="editing ? '编辑模型' : '添加模型'" :confirm-loading="saving" @ok="handleSubmit">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
@@ -113,6 +126,7 @@ import { message } from 'ant-design-vue'
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { getModelList, createModel, updateModel, deleteModel, updateModelStatus, getModelVersions } from '@/api/modelApi'
 import type { ModelItem } from '@/types/api'
+import StatusTag from '@/components/common/StatusTag.vue'
 import { formatTime } from '@/utils'
 
 const models = ref<ModelItem[]>([])
@@ -144,16 +158,6 @@ const rules = {
   api_base_url: [{ required: true, message: '请输入 API 地址' }],
   api_key: [{ required: true, message: '请输入 API Key', trigger: 'blur' }]
 }
-
-const statusMap: Record<string, { text: string; color: string }> = {
-  online: { text: '在线', color: 'success' },
-  offline: { text: '离线', color: 'error' },
-  high_latency: { text: '高延迟', color: 'warning' },
-  pending: { text: '待配置', color: 'default' }
-}
-
-function statusColor(status: string) { return statusMap[status]?.color || 'default' }
-function statusText(status: string) { return statusMap[status]?.text || status }
 
 async function loadModels() {
   loading.value = true

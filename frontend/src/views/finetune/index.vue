@@ -2,29 +2,30 @@
   <div class="page-container">
     <a-tabs v-model:activeKey="activeTab">
       <a-tab-pane key="tasks" tab="微调任务">
-        <div class="table-toolbar">
-          <a-space>
-            <a-select v-model:value="taskQuery.status" placeholder="状态" allow-clear style="width: 130px">
-              <a-select-option v-for="(text, val) in taskStatusMap" :key="val" :value="val">{{ text }}</a-select-option>
-            </a-select>
-            <a-button type="primary" @click="loadTasks">查询</a-button>
-          </a-space>
-          <a-button type="primary" @click="openCreateTaskModal">
-            <template #icon><PlusOutlined /></template>
-            创建微调任务
-          </a-button>
-        </div>
+        <div class="panel-card">
+          <div class="table-toolbar">
+            <a-space>
+              <a-select v-model:value="taskQuery.status" placeholder="状态" allow-clear style="width: 130px">
+                <a-select-option v-for="(text, val) in taskStatusMap" :key="val" :value="val">{{ text }}</a-select-option>
+              </a-select>
+              <a-button type="primary" @click="loadTasks">查询</a-button>
+            </a-space>
+            <a-button type="primary" @click="openCreateTaskModal">
+              <template #icon><PlusOutlined /></template>
+              创建微调任务
+            </a-button>
+          </div>
 
-        <a-table :data-source="tasks" :loading="taskLoading" row-key="id" :pagination="false">
-          <a-table-column title="任务名称" data-index="name" key="name" />
-          <a-table-column title="基座模型" key="base_model_id" width="130">
-            <template #default="{ record }">{{ getModelName(record.base_model_id) }}</template>
-          </a-table-column>
-          <a-table-column title="状态" key="status" width="100">
-            <template #default="{ record }">
-              <a-tag :color="taskStatusColor(record.status)">{{ taskStatusText(record.status) }}</a-tag>
-            </template>
-          </a-table-column>
+          <a-table :data-source="tasks" :loading="taskLoading" row-key="id" :pagination="false">
+            <a-table-column title="任务名称" data-index="name" key="name" />
+            <a-table-column title="基座模型" key="base_model_id" width="130">
+              <template #default="{ record }">{{ getModelName(record.base_model_id) }}</template>
+            </a-table-column>
+            <a-table-column title="状态" key="status" width="100">
+              <template #default="{ record }">
+                <StatusTag :status="record.status" />
+              </template>
+            </a-table-column>
           <a-table-column title="进度" key="progress" width="180">
             <template #default="{ record }">
               <a-progress :percent="record.progress" size="small" />
@@ -45,33 +46,36 @@
             </template>
           </a-table-column>
         </a-table>
+        </div>
       </a-tab-pane>
 
       <a-tab-pane key="datasets" tab="数据集">
-        <div class="table-toolbar">
-          <div></div>
-          <a-button type="primary" @click="openDatasetModal">
-            <template #icon><UploadOutlined /></template>
-            上传数据集
-          </a-button>
+        <div class="panel-card">
+          <div class="table-toolbar">
+            <div></div>
+            <a-button type="primary" @click="openDatasetModal">
+              <template #icon><UploadOutlined /></template>
+              上传数据集
+            </a-button>
+          </div>
+          <a-table :data-source="datasets" :loading="datasetLoading" row-key="id" :pagination="false">
+            <a-table-column title="数据集名称" data-index="name" key="name" />
+            <a-table-column title="格式" data-index="format" key="format" width="80">
+              <template #default="{ text }"><a-tag color="purple">{{ text }}</a-tag></template>
+            </a-table-column>
+            <a-table-column title="样本数" data-index="sample_count" key="samples" width="100" />
+            <a-table-column title="文件大小" key="file_size" width="100">
+              <template #default="{ record }">{{ formatFileSize(record.file_size) }}</template>
+            </a-table-column>
+            <a-table-column title="版本" data-index="version" key="version" width="80" />
+            <a-table-column title="标注状态" key="annotation_status" width="110">
+              <template #default="{ record }">
+                <StatusTag :status="record.annotation_status" :custom-text="{pending:'待标注',labeling:'标注中',labeled:'已标注',reviewing:'审核中',reviewed:'已审核'}" />
+              </template>
+            </a-table-column>
+            <a-table-column title="创建人" data-index="created_by" key="created_by" width="100" />
+          </a-table>
         </div>
-        <a-table :data-source="datasets" :loading="datasetLoading" row-key="id" :pagination="false">
-          <a-table-column title="数据集名称" data-index="name" key="name" />
-          <a-table-column title="格式" data-index="format" key="format" width="80">
-            <template #default="{ text }"><a-tag color="purple">{{ text }}</a-tag></template>
-          </a-table-column>
-          <a-table-column title="样本数" data-index="sample_count" key="samples" width="100" />
-          <a-table-column title="文件大小" key="file_size" width="100">
-            <template #default="{ record }">{{ formatFileSize(record.file_size) }}</template>
-          </a-table-column>
-          <a-table-column title="版本" data-index="version" key="version" width="80" />
-          <a-table-column title="标注状态" key="annotation_status" width="110">
-            <template #default="{ record }">
-              <a-tag>{{ annotationStatusText(record.annotation_status) }}</a-tag>
-            </template>
-          </a-table-column>
-          <a-table-column title="创建人" data-index="created_by" key="created_by" width="100" />
-        </a-table>
       </a-tab-pane>
     </a-tabs>
 
@@ -160,6 +164,7 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive, computed } from 'vue'
 import { message } from 'ant-design-vue'
+import StatusTag from '@/components/common/StatusTag.vue'
 import { PlusOutlined, UploadOutlined, InboxOutlined } from '@ant-design/icons-vue'
 import { getFinetuneTaskList, createFinetuneTask, cancelFinetuneTask, getDatasetList, createDataset } from '@/api/finetuneApi'
 import { getModelList } from '@/api/modelApi'
@@ -194,17 +199,7 @@ const taskStatusMap: Record<string, string> = {
   pending: '待运行', queued: '排队中', running: '运行中', paused: '已暂停',
   completed: '已完成', failed: '失败', cancelled: '已取消', deployed: '已部署'
 }
-const taskStatusColorMap: Record<string, string> = {
-  pending: 'default', queued: 'processing', running: 'processing', paused: 'warning',
-  completed: 'success', failed: 'error', cancelled: 'default', deployed: 'cyan'
-}
 function taskStatusText(s: string) { return taskStatusMap[s] || s }
-function taskStatusColor(s: string) { return taskStatusColorMap[s] || 'default' }
-
-const annotationStatusMap: Record<string, string> = {
-  pending: '待标注', labeling: '标注中', labeled: '已标注', reviewing: '审核中', reviewed: '已审核'
-}
-function annotationStatusText(s: string) { return annotationStatusMap[s] || s }
 
 const modelOptions = computed(() => models.value.map((m) => ({ label: `${m.name} (${m.provider})`, value: m.id })))
 const datasetOptions = computed(() => datasets.value.map((d) => ({ label: d.name, value: d.id })))

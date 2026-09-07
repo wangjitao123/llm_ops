@@ -1,27 +1,32 @@
 <template>
   <div class="page-container">
-    <div class="table-toolbar">
-      <div></div>
-      <a-button type="primary" @click="openCreateModal">
-        <template #icon><PlusOutlined /></template>
-        新建对比评估
-      </a-button>
+    <div class="page-title-row">
+      <h3>模型对比评估</h3>
+      <p>多模型综合评分与选型推荐</p>
     </div>
+    <div class="panel-card">
+      <div class="table-toolbar">
+        <div></div>
+        <a-button type="primary" @click="openCreateModal">
+          <template #icon><PlusOutlined /></template>
+          新建对比评估
+        </a-button>
+      </div>
 
-    <a-table :data-source="evals" :loading="loading" row-key="id" :pagination="false">
-      <a-table-column title="评估名称" data-index="name" key="name" />
-      <a-table-column title="参与模型" key="model_names">
-        <template #default="{ record }">
-          <a-space wrap>
-            <a-tag v-for="id in record.model_ids" :key="id" color="blue">{{ getModelName(id) }}</a-tag>
-          </a-space>
-        </template>
-      </a-table-column>
-      <a-table-column title="状态" key="status" width="100">
-        <template #default="{ record }">
-          <a-tag :color="evalStatusColor(record.status)">{{ evalStatusText(record.status) }}</a-tag>
-        </template>
-      </a-table-column>
+      <a-table :data-source="evals" :loading="loading" row-key="id" :pagination="false">
+        <a-table-column title="评估名称" data-index="name" key="name" />
+        <a-table-column title="参与模型" key="model_names">
+          <template #default="{ record }">
+            <a-space wrap>
+              <a-tag v-for="id in record.model_ids" :key="id" color="blue">{{ getModelName(id) }}</a-tag>
+            </a-space>
+          </template>
+        </a-table-column>
+        <a-table-column title="状态" key="status" width="100">
+          <template #default="{ record }">
+            <StatusTag :status="record.status" />
+          </template>
+        </a-table-column>
       <a-table-column title="综合评分" key="overall" width="100">
         <template #default="{ record }">
           <span v-if="record.result?.overall_score">
@@ -40,6 +45,7 @@
         </template>
       </a-table-column>
     </a-table>
+    </div>
 
     <a-modal v-model:open="createModalOpen" title="新建对比评估" :confirm-loading="creating" @ok="handleCreate">
       <a-form :model="form" layout="vertical">
@@ -88,6 +94,7 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive, computed } from 'vue'
 import { message } from 'ant-design-vue'
+import StatusTag from '@/components/common/StatusTag.vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { getCompareList, createCompare, getCompareDetail } from '@/api/compareApi'
 import type { CompareItem } from '@/api/compareApi'
@@ -106,15 +113,6 @@ const currentResult = ref<CompareItem | null>(null)
 const form = reactive({ name: '', model_ids: [] as number[] })
 
 const modelOptions = computed(() => models.value.map((m) => ({ label: `${m.name} (${m.provider})`, value: m.id })))
-
-const statusMap: Record<string, { text: string; color: string }> = {
-  pending: { text: '待评估', color: 'default' },
-  running: { text: '评估中', color: 'processing' },
-  completed: { text: '已完成', color: 'success' },
-  failed: { text: '失败', color: 'error' }
-}
-function evalStatusText(s: string) { return statusMap[s]?.text || s }
-function evalStatusColor(s: string) { return statusMap[s]?.color || 'default' }
 
 const dimensionMap: Record<string, string> = {
   quality: '生成质量', latency: '响应延迟', cost: '调用成本',

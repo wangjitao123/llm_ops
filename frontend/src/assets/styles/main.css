@@ -1,55 +1,170 @@
+/* ============================================================
+   大模型监测管理平台 — 全局主题（对齐 prototype-v2 视觉语言）
+   ============================================================ */
 :root {
-  --primary-color: #1677ff;
-  --bg-color: #f5f7fa;
+  /* 主色（Ant Design blue） */
+  --primary: #1890ff;
+  --primary-hover: #40a9ff;
+  --primary-active: #096dd9;
+
+  /* 背景 & 卡片 */
+  --bg-body: #f0f2f5;
+  --bg-card: #ffffff;
+  --border-card: #f0f0f0;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+  /* 文本 */
+  --text-main: rgba(0, 0, 0, 0.85);
+  --text-secondary: rgba(0, 0, 0, 0.55);
+  --text-tertiary: #8c8c8c;
+  --text-heading: rgba(0, 0, 0, 0.88);
+
+  /* 侧边栏 */
+  --sidebar-bg: #001529;
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
+  --sidebar-active: #1890ff;
+
+  /* 状态色（原型徽章配色） */
+  --st-online-bg: #f6ffed; --st-online-fg: #52c41a; --st-online-bd: #b7eb8f;
+  --st-offline-bg: #fff2f0; --st-offline-fg: #ff4d4f; --st-offline-bd: #ffccc7;
+  --st-warn-bg: #fffbe6; --st-warn-fg: #faad14; --st-warn-bd: #ffe58f;
+  --st-pending-bg: #e6f7ff; --st-pending-fg: #1890ff; --st-pending-bd: #91d5ff;
+  --st-disabled-bg: #fafafa; --st-disabled-fg: #8c8c8c; --st-disabled-bd: #d9d9d9;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
-html, body, #app {
-  height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-}
+html, body, #app { height: 100%; }
 
 body {
-  background-color: var(--bg-color);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background-color: var(--bg-body);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
 }
 
+/* ============================================================
+   页面容器
+   ============================================================ */
 .page-container {
-  padding: 24px;
-  background: #fff;
-  border-radius: 8px;
   min-height: 100%;
 }
 
-.table-toolbar {
+/* 卡片式容器（替代默认 a-card 观感，贴近原型 table-card/form-card） */
+.panel-card {
+  background: var(--bg-card);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
   margin-bottom: 16px;
+}
+.panel-card .panel-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-card);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.panel-card .panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-heading);
+  margin: 0;
+}
+.panel-card .panel-body { padding: 20px; }
+.panel-card .panel-body.padless { padding: 0; }
+
+/* 工具栏行 */
+.table-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.table-toolbar .toolbar-actions {
-  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-card);
 }
+.table-toolbar .toolbar-actions { display: flex; gap: 8px; }
+.table-toolbar .toolbar-filters { display: flex; gap: 8px; flex-wrap: wrap; }
 
-.status-dot {
+/* 表格微调：表头浅灰底（原型 th #fafafa） */
+.panel-card .ant-table-thead > tr > th {
+  background: #fafafa;
+  font-weight: 600;
+  font-size: 13px;
+  color: #595959;
+  border-bottom: 1px solid var(--border-card);
+}
+.panel-card .ant-table-tbody > tr:hover > td { background: #fafafa !important; }
+
+/* ============================================================
+   状态徽章（胶囊，对齐原型 .status-badge）
+   ============================================================ */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.status-badge .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 6px;
 }
+.status-online  { background: var(--st-online-bg);  color: var(--st-online-fg);  border-color: var(--st-online-bd); }
+.status-offline { background: var(--st-offline-bg); color: var(--st-offline-fg); border-color: var(--st-offline-bd); }
+.status-high_latency, .status-warning, .status-expired, .status-warn { background: var(--st-warn-bg); color: var(--st-warn-fg); border-color: var(--st-warn-bd); }
+.status-pending, .status-active, .status-queued, .status-running, .status-processing { background: var(--st-pending-bg); color: var(--st-pending-fg); border-color: var(--st-pending-bd); }
+.status-disabled, .status-revoked, .status-cancelled, .status-failed { background: var(--st-disabled-bg); color: var(--st-disabled-fg); border-color: var(--st-disabled-bd); }
+.status-success, .status-completed, .status-enabled, .status-deployed { background: var(--st-online-bg); color: var(--st-online-fg); border-color: var(--st-online-bd); }
+.status-paused, .status-failed { background: var(--st-offline-bg); color: var(--st-offline-fg); border-color: var(--st-offline-bd); }
 
-.status-online { background-color: #52c41a; }
-.status-offline { background-color: #ff4d4f; }
-.status-high_latency { background-color: #faad14; }
-.status-pending { background-color: #d9d9d9; }
-.status-active { background-color: #52c41a; }
-.status-disabled { background-color: #d9d9d9; }
-.status-expired { background-color: #faad14; }
-.status-revoked { background-color: #ff4d4f; }
+/* ============================================================
+   统计卡片（原型 .stat-card）
+   ============================================================ */
+.stat-card {
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: box-shadow 0.2s;
+  height: 100%;
+}
+.stat-card:hover { box-shadow: var(--shadow-card-hover); }
+.stat-card .stat-icon {
+  width: 52px; height: 52px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+.stat-card .stat-value { font-size: 26px; font-weight: 700; line-height: 1.2; color: var(--text-heading); }
+.stat-card .stat-label { font-size: 13px; color: var(--text-tertiary); margin-top: 2px; }
+.stat-card .stat-trend { font-size: 12px; margin-top: 4px; }
+
+/* ============================================================
+   页面级通用
+   ============================================================ */
+.page-title-row { margin-bottom: 16px; }
+.page-title-row h3 { font-size: 18px; font-weight: 600; color: var(--text-heading); margin: 0; }
+.page-title-row p { color: var(--text-tertiary); font-size: 13px; margin: 4px 0 0; }
+
+.ant-btn-primary { background: var(--primary); border-color: var(--primary); }
+.ant-btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #d9d9d9; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #bfbfbf; }
