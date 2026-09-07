@@ -93,13 +93,30 @@ const onlineCount = computed(() => modelStatusList.value.filter((m) => m.status 
 
 async function loadDashboard() {
   try {
-    const [models, keys] = await Promise.all([
+    const fmtLocal = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const today = new Date()
+
+    const [models, keys, todayStats] = await Promise.all([
       getModelList(),
-      getKeyList({ page: 1, size: 999 })
+      getKeyList({ page: 1, size: 999 }),
+      // 今日 Token/请求量：按"今天"窗口查（聚合表 daily 粒度）
+      getTokenStats({
+        dimension_type: 'model',
+        start_date: fmtLocal(today),
+        end_date: fmtLocal(today),
+        granularity: 'daily'
+      }).catch(() => null)
     ])
+
     modelStatusList.value = models
     statCards.value[0].value = models.length
     statCards.value[1].value = keys.filter((k: KeyItem) => k.status === 'active').length
+
+    if (todayStats) {
+      statCards.value[2].value = todayStats.total_tokens || 0
+      statCards.value[3].value = todayStats.points.reduce((sum, p) => sum + (p.request_count || 0), 0)
+    }
   } catch {
     /* 后台接口暂不可用时不阻塞页面 */
   }
