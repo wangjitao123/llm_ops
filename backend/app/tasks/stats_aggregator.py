@@ -2,95 +2,137 @@ from datetime import datetime, timezone, timedelta, date
 from celery import shared_task
 from app.tasks.worker import celery_app
 from app.core.database import async_session
-from app.models.token import TokenStatsHourly, TokenStatsDaily
-from sqlalchemy import select, func
+from app.models.token import TokenStatsHourly, TokenStatsDaily, ApiRequestLog
+from sqlalchemy import select, func, delete
+
+# 时区：服务器容器 TZ=Asia/Shanghai；日志 created_at 存 UTC（TIMESTAMPTZ）。
+# 统计按"东八区自然小时/自然日"切窗，避免 UTC/本地日期错位。
+LOCAL_TZ = timezone(timedelta(hours=8))
+
+
+def _to_local(dt: datetime) -> datetime:
+    """把（可能 naive 或 UTC 的）时间归一为东八区。"""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(LOCAL_TZ)
 
 
 @celery_app.task(name="aggregate_hourly_stats")
-def aggregate_hourly_stats():
-    """Aggregate request logs into hourly statistics."""
+def aggregate_hourly_stats(hour_offsets: list[int] | None = None, days_back: int = 0):
+    """聚合请求日志到小时统计。
+
+    - 定时调用：无参，聚合最近 1 个完整自然小时；
+    - 手动补数：传 hour_offsets=[0,1,2,...]（今天往前第 N 小时）或 days_back。
+    """
     import asyncio
-    asyncio.run(_aggregate_hourly())
+    asyncio.run(_aggregate_hourly(hour_offsets=hour_offsets, days_back=days_back))
 
 
-async def _aggregate_hourly():
-    now = datetime.now(timezone.utc)
-    last_hour = now - timedelta(hours=1)
-    stats_date = last_hour.date()
-    stats_hour = last_hour.hour
-    
+async def _aggregate_hourly(hour_offsets: list[int] | None = None, days_back: int = 0):
+    now_local = _to_local(datetime.now(timezone.utc))
     async with async_session() as session:
-        # Aggregate by model
-        from app.models.token import ApiRequestLog
-        stmt = select(
-            ApiRequestLog.model_id,
-            func.count().label("request_count"),
-            func.sum(ApiRequestLog.prompt_tokens).label("prompt_tokens"),
-            func.sum(ApiRequestLog.completion_tokens).label("completion_tokens"),
-            func.sum(ApiRequestLog.total_tokens).label("total_tokens"),
-            func.avg(ApiRequestLog.response_time_ms).label("avg_response_ms"),
-        ).where(
-            ApiRequestLog.created_at >= last_hour,
-            ApiRequestLog.created_at < now,
-            ApiRequestLog.model_id.isnot(None),
-        ).group_by(ApiRequestLog.model_id)
-        
-        result = await session.execute(stmt)
-        for row in result.all():
-            stats = TokenStatsHourly(
-                stats_date=stats_date,
-                stats_hour=stats_hour,
-                dimension_type="model",
-                dimension_id=row.model_id or 0,
-                request_count=row.request_count,
-                prompt_tokens=row.prompt_tokens or 0,
-                completion_tokens=row.completion_tokens or 0,
-                total_tokens=row.total_tokens or 0,
-                avg_response_ms=int(row.avg_response_ms or 0),
+        # 确定要聚合的（日期, 小时）窗口
+        targets: list[tuple[date, int]] = []
+        if hour_offsets:
+            for off in hour_offsets:
+                t = now_local - timedelta(hours=off)
+                targets.append((t.date(), t.hour))
+        elif days_back > 0:
+            for d in range(days_back, -1, -1):
+                t = now_local - timedelta(days=d)
+                targets.append((t.date(), t.hour))
+        else:
+            # 默认：最近 1 个完整自然小时（如现在是 10:40 → 聚合 9 点整段）
+            prev_hour = now_local.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
+            targets.append((prev_hour.date(), prev_hour.hour))
+
+        for stats_date, stats_hour in targets:
+            # 窗口：该小时 [date hour:00, +1h)，用 UTC 边界比较
+            start_local = datetime(stats_date.year, stats_date.month, stats_date.day, stats_hour, tzinfo=LOCAL_TZ)
+            end_local = start_local + timedelta(hours=1)
+            start_utc = start_local.astimezone(timezone.utc)
+            end_utc = end_local.astimezone(timezone.utc)
+
+            # 幂等：先删掉该小时已有聚合（避免定时+手动重复累加）
+            await session.execute(
+                delete(TokenStatsHourly).where(
+                    TokenStatsHourly.stats_date == stats_date,
+                    TokenStatsHourly.stats_hour == stats_hour,
+                )
             )
-            session.add(stats)
-        
+
+            stmt = select(
+                ApiRequestLog.model_id,
+                func.count().label("request_count"),
+                func.sum(ApiRequestLog.prompt_tokens).label("prompt_tokens"),
+                func.sum(ApiRequestLog.completion_tokens).label("completion_tokens"),
+                func.sum(ApiRequestLog.total_tokens).label("total_tokens"),
+                func.avg(ApiRequestLog.response_time_ms).label("avg_response_ms"),
+            ).where(
+                ApiRequestLog.created_at >= start_utc,
+                ApiRequestLog.created_at < end_utc,
+                ApiRequestLog.model_id.isnot(None),
+            ).group_by(ApiRequestLog.model_id)
+
+            result = await session.execute(stmt)
+            for row in result.all():
+                stats = TokenStatsHourly(
+                    stats_date=stats_date,
+                    stats_hour=stats_hour,
+                    dimension_type="model",
+                    dimension_id=row.model_id or 0,
+                    request_count=row.request_count,
+                    prompt_tokens=row.prompt_tokens or 0,
+                    completion_tokens=row.completion_tokens or 0,
+                    total_tokens=row.total_tokens or 0,
+                    avg_response_ms=int(row.avg_response_ms or 0),
+                )
+                session.add(stats)
+
         await session.commit()
 
 
 @celery_app.task(name="aggregate_daily_stats")
 def aggregate_daily_stats():
-    """Aggregate hourly stats into daily statistics."""
+    """聚合小时统计到天统计（幂等：先删当天再重算）。"""
     import asyncio
     asyncio.run(_aggregate_daily())
 
 
 async def _aggregate_daily():
-    yesterday = date.today() - timedelta(days=1)
-    
     async with async_session() as session:
-        stmt = select(
-            TokenStatsHourly.dimension_type,
-            TokenStatsHourly.dimension_id,
-            func.sum(TokenStatsHourly.request_count).label("request_count"),
-            func.sum(TokenStatsHourly.prompt_tokens).label("prompt_tokens"),
-            func.sum(TokenStatsHourly.completion_tokens).label("completion_tokens"),
-            func.sum(TokenStatsHourly.total_tokens).label("total_tokens"),
-            func.avg(TokenStatsHourly.avg_response_ms).label("avg_response_ms"),
-        ).where(
-            TokenStatsHourly.stats_date == yesterday,
-        ).group_by(
-            TokenStatsHourly.dimension_type,
-            TokenStatsHourly.dimension_id,
-        )
-        
-        result = await session.execute(stmt)
-        for row in result.all():
-            daily = TokenStatsDaily(
-                stats_date=yesterday,
-                dimension_type=row.dimension_type,
-                dimension_id=row.dimension_id,
-                request_count=row.request_count,
-                prompt_tokens=row.prompt_tokens or 0,
-                completion_tokens=row.completion_tokens or 0,
-                total_tokens=row.total_tokens or 0,
-                avg_response_ms=int(row.avg_response_ms or 0),
+        # 重算近 7 天（覆盖可能晚到的小时数据）
+        today_local = _to_local(datetime.now(timezone.utc)).date()
+        for i in range(7):
+            d = today_local - timedelta(days=i)
+            await session.execute(
+                delete(TokenStatsDaily).where(TokenStatsDaily.stats_date == d)
             )
-            session.add(daily)
-        
+            stmt = select(
+                TokenStatsHourly.dimension_type,
+                TokenStatsHourly.dimension_id,
+                func.sum(TokenStatsHourly.request_count).label("request_count"),
+                func.sum(TokenStatsHourly.prompt_tokens).label("prompt_tokens"),
+                func.sum(TokenStatsHourly.completion_tokens).label("completion_tokens"),
+                func.sum(TokenStatsHourly.total_tokens).label("total_tokens"),
+                func.avg(TokenStatsHourly.avg_response_ms).label("avg_response_ms"),
+            ).where(
+                TokenStatsHourly.stats_date == d,
+            ).group_by(
+                TokenStatsHourly.dimension_type,
+                TokenStatsHourly.dimension_id,
+            )
+            result = await session.execute(stmt)
+            for row in result.all():
+                daily = TokenStatsDaily(
+                    stats_date=d,
+                    dimension_type=row.dimension_type,
+                    dimension_id=row.dimension_id,
+                    request_count=row.request_count,
+                    prompt_tokens=row.prompt_tokens or 0,
+                    completion_tokens=row.completion_tokens or 0,
+                    total_tokens=row.total_tokens or 0,
+                    avg_response_ms=int(row.avg_response_ms or 0),
+                )
+                session.add(daily)
         await session.commit()
