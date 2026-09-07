@@ -21,13 +21,14 @@
           <div class="panel-header">
             <span class="panel-title">Token 用量趋势</span>
             <a-radio-group v-model:value="trendDays" size="small" @change="renderChart">
-              <a-radio-button value="7">7 天</a-radio-button>
-              <a-radio-button value="30">30 天</a-radio-button>
+              <a-radio-button :value="7">7 天</a-radio-button>
+              <a-radio-button :value="30">30 天</a-radio-button>
             </a-radio-group>
           </div>
           <div class="panel-body">
             <a-spin :spinning="chartLoading">
-              <div ref="chartRef" style="height: 300px"></div>
+              <a-empty v-if="chartEmpty" description="所选时间范围内暂无 Token 用量数据（可点击右上角切换 7/30 天）" style="padding: 60px 0" />
+              <div v-show="!chartEmpty" ref="chartRef" style="height: 300px"></div>
             </a-spin>
           </div>
         </div>
@@ -85,6 +86,7 @@ const statCards = ref([
 const modelStatusList = ref<ModelItem[]>([])
 const chartLoading = ref(false)
 const chartRef = ref<HTMLDivElement>()
+const chartEmpty = ref(false)
 const trendDays = ref<number>(7)
 
 const onlineCount = computed(() => modelStatusList.value.filter((m) => m.status === 'online').length)
@@ -104,23 +106,35 @@ async function loadDashboard() {
 }
 
 async function renderChart() {
-  if (!chartRef.value) return
+  const el = chartRef.value
+  if (!el) return
   chartLoading.value = true
   try {
+    // radio-group 返回字符串，统一转数字
+    const days = Number(trendDays.value) || 7
     const endDate = new Date()
     const startDate = new Date()
-    startDate.setDate(startDate.getDate() - trendDays.value)
+    startDate.setDate(endDate.getDate() - days)
 
-    const fmt = (d: Date) => d.toISOString().slice(0, 10)
+    // 用本地时间拼接 YYYY-MM-DD，避免 toISOString(UTC) 跨日错位
+    const fmtLocal = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
     const stats = await getTokenStats({
       dimension_type: 'model',
-      start_date: fmt(startDate),
-      end_date: fmt(endDate),
+      start_date: fmtLocal(startDate),
+      end_date: fmtLocal(endDate),
       granularity: 'daily'
     })
 
     chartInstance?.dispose()
-    const chart = echarts.init(chartRef.value)
+    // 空数据：隐藏图表并提示
+    if (!stats.points || stats.points.length === 0) {
+      chartEmpty.value = true
+      return
+    }
+    chartEmpty.value = false
+    const chart = echarts.init(el)
     chart.setOption({
       tooltip: { trigger: 'axis' },
       legend: { data: ['总 Token'], top: 0 },
