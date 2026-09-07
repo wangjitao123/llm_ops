@@ -193,7 +193,7 @@ function openEditModal(record: KeyItem) {
   editing.value = true
   Object.assign(form, {
     id: record.id, name: record.name, application_id: record.application_id,
-    model_ids: [], qps_limit: record.qps_limit, token_quota: record.token_quota,
+    model_ids: record.model_ids || [], qps_limit: record.qps_limit, token_quota: record.token_quota,
     expires_at: record.expires_at ? dayjs(record.expires_at) : undefined
   })
   modalOpen.value = true

@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from tests.helpers import mock_orm
@@ -14,7 +14,10 @@ def mock_db():
 
 @pytest.fixture
 def key_service(mock_db):
-    return KeyService(mock_db)
+    svc = KeyService(mock_db)
+    # _to_response 现在会查询模型权限，默认给空
+    svc.repo.get_model_permissions = AsyncMock(return_value=[])
+    return svc
 
 
 @pytest.mark.asyncio

@@ -51,11 +51,11 @@ class KeyService:
         key = await self.repo.get_by_id(key_id)
         if not key:
             return None
-        return self._to_response(key)
+        return await self._to_response(key)
 
     async def list_keys(self, status: Optional[str] = None) -> list[dict]:
         keys = await self.repo.get_all(status)
-        return [self._to_response(k) for k in keys]
+        return [await self._to_response(k) for k in keys]
 
     async def update_key(self, key_id: int, data: KeyUpdate, user: str) -> Optional[dict]:
         update_data = data.model_dump(exclude_unset=True, exclude={"model_ids"})
@@ -65,7 +65,7 @@ class KeyService:
         key = await self.repo.update_key(key_id, update_data)
         if not key:
             return None
-        return self._to_response(key)
+        return await self._to_response(key)
 
     async def delete_key(self, key_id: int) -> bool:
         key = await self.repo.get_by_id(key_id)
@@ -83,7 +83,14 @@ class KeyService:
             return None
         return {"id": key.id, "qps_limit": key.qps_limit, "token_quota": key.token_quota}
 
-    def _to_response(self, key) -> dict:
+    async def _to_response(self, key) -> dict:
+        perms = await self.repo.get_model_permissions(key.id)
+        # AppKeyModel 无 deleted_at 时 hasattr 判断保持兼容
+        model_ids = []
+        for p in perms:
+            if hasattr(p, "deleted_at") and p.deleted_at:
+                continue
+            model_ids.append(p.model_id)
         return {
             "id": key.id,
             "name": key.name,
@@ -94,6 +101,7 @@ class KeyService:
             "rpd_limit": key.rpd_limit,
             "token_quota": key.token_quota,
             "token_used": key.token_used,
+            "model_ids": model_ids,
             "expires_at": key.expires_at.isoformat() if key.expires_at else None,
             "status": key.status,
             "last_used_at": key.last_used_at.isoformat() if key.last_used_at else None,

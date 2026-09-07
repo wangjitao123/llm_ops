@@ -44,6 +44,7 @@ export interface KeyItem {
   key_prefix: string
   key_full?: string
   application_id?: number | null
+  model_ids?: number[]
   qps_limit?: number | null
   rpm_limit?: number | null
   rpd_limit?: number | null
