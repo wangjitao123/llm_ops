@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.key import AppKey, AppKeyModel, Application
 
@@ -45,8 +45,9 @@ class KeyRepo:
         )
 
     async def set_model_permissions(self, key_id: int, model_ids: list[int]) -> None:
+        # 物理删除旧的权限记录（app_key_model 无 deleted_at 列，直接 delete 再插入）
         await self.db.execute(
-            update(AppKeyModel).where(AppKeyModel.app_key_id == key_id).values(deleted_at=func.now())
+            delete(AppKeyModel).where(AppKeyModel.app_key_id == key_id)
         )
         for model_id in model_ids:
             perm = AppKeyModel(app_key_id=key_id, model_id=model_id)

@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.gateway import RouteRule, RouteRuleModel, RateLimitConfig
@@ -41,8 +41,9 @@ class GatewayRepo:
         )
 
     async def set_route_targets(self, route_id: int, targets: list[dict]) -> None:
+        # RouteRuleModel 无 deleted_at 列，物理删除旧目标再插入
         await self.db.execute(
-            update(RouteRuleModel).where(RouteRuleModel.route_rule_id == route_id).values(deleted_at=func.now())
+            delete(RouteRuleModel).where(RouteRuleModel.route_rule_id == route_id)
         )
         for t in targets:
             target = RouteRuleModel(
