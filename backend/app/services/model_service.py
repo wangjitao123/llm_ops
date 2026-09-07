@@ -16,10 +16,12 @@ class ModelService:
         model = await self.repo.create(model_data)
         
         # Create initial version
+        # 快照存提交配置（脱敏，不含明文 api_key）
+        version_snapshot = data.model_dump(exclude={"api_key"})
         version_data = {
             "model_id": model.id,
             "version": "1.0.0",
-            "model_config_snapshot": data.model_config,
+            "model_config_snapshot": version_snapshot,
             "is_current": True,
             "change_log": "Initial version",
             "created_by": user,
@@ -52,7 +54,7 @@ class ModelService:
         version_data = {
             "model_id": model.id,
             "version": f"{model.version.split('.')[0]}.{int(model.version.split('.')[1]) + 1}.0",
-            "model_config_snapshot": data.model_config,
+            "model_config_snapshot": update_data,
             "is_current": True,
             "change_log": "Configuration updated",
             "created_by": user,

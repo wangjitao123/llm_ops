@@ -12,7 +12,6 @@ class ModelCreate(BaseModel):
     timeout_ms: int = Field(default=60000, ge=1000)
     weight: int = Field(default=1, ge=1)
     health_check_url: Optional[str] = None
-    model_config: Optional[dict] = None
     description: Optional[str] = None
 
 
@@ -24,7 +23,6 @@ class ModelUpdate(BaseModel):
     timeout_ms: Optional[int] = None
     weight: Optional[int] = None
     health_check_url: Optional[str] = None
-    model_config: Optional[dict] = None
     description: Optional[str] = None
 
 
@@ -39,7 +37,6 @@ class ModelResponse(BaseModel):
     weight: int
     status: str
     health_check_url: Optional[str] = None
-    model_config: Optional[dict] = None
     description: Optional[str] = None
     created_by: str
     created_at: datetime
