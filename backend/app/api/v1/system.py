@@ -1,12 +1,44 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.security import create_access_token
 from app.services.system_service import SystemService
 from app.schemas.system import SystemConfigCreate, AlertRuleCreate
 from app.schemas.common import ApiResponse
 
 router = APIRouter()
+
+
+class DevLoginRequest(BaseModel):
+    """开发模式直连登录请求体。"""
+    role: str = "admin"  # admin / developer / manager / scientist
+
+
+class DevLoginResponse(BaseModel):
+    token: str
+    user: dict
+
+
+# 开发模式直连登录（未对接公司 SSO 前使用）
+# ⚠️ 仅在 settings.enable_dev_login 开启时可用；对接 SSO 后必须关闭。
+@router.post("/dev-login", response_model=ApiResponse)
+async def dev_login(data: DevLoginRequest | None = None):
+    if not settings.enable_dev_login:
+        raise HTTPException(status_code=403, detail="Dev login disabled")
+
+    role = (data.role if data else "admin")
+    role_map = {
+        "admin": {"id": "dev-admin", "name": "开发管理员", "role": "admin", "roles": ["admin", "developer", "manager", "scientist"]},
+        "developer": {"id": "dev-developer", "name": "开发人员", "role": "developer", "roles": ["developer"]},
+        "manager": {"id": "dev-manager", "name": "业务管理者", "role": "manager", "roles": ["manager"]},
+        "scientist": {"id": "dev-scientist", "name": "数据科学家", "role": "scientist", "roles": ["scientist"]},
+    }
+    user_info = role_map.get(role, role_map["admin"])
+    token = create_access_token({"sub": user_info["id"], "role": user_info["role"], "roles": user_info["roles"]})
+    return ApiResponse(data=DevLoginResponse(token=token, user=user_info).model_dump())
 
 
 # SSO Configuration

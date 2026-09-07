@@ -23,6 +23,7 @@ import { useRouter } from 'vue-router'
 import { SafetyCertificateOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { useUserStore } from '@/stores/userStore'
+import { devLogin } from '@/api/systemApi'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -31,32 +32,33 @@ const ssoLoading = ref(false)
 async function handleSSOLogin() {
   ssoLoading.value = true
   try {
-    // TODO: Redirect to SSO authorize URL from system config
-    // In production: window.location.href = `${ssoAuthorizeUrl}?client_id=...&redirect_uri=...`
-    // Simulated SSO callback for demo
-    userStore.setToken('demo-sso-token')
-    userStore.setUser({
-      id: 'admin',
-      name: '平台管理员',
-      role: 'admin',
-      roles: ['admin', 'developer']
-    })
-    message.success('SSO 登录成功')
+    // TODO: 对接真实 SSO —— 重定向到 SSO authorize URL，回跳后由 /auth/callback 换取令牌
+    // 当前 SSO 未配置时，走开发登录通道获取可用令牌
+    const res = await devLogin('admin')
+    userStore.setToken(res.token)
+    userStore.setUser(res.user)
+    message.success('登录成功')
     router.push('/dashboard')
+  } catch (e) {
+    message.error('登录失败：请确认后端服务已启用 dev-login')
   } finally {
     ssoLoading.value = false
   }
 }
 
-function handleDevLogin() {
-  userStore.setToken('dev-token')
-  userStore.setUser({
-    id: 'dev-admin',
-    name: '开发管理员',
-    role: 'admin',
-    roles: ['admin']
-  })
-  router.push('/dashboard')
+async function handleDevLogin() {
+  ssoLoading.value = true
+  try {
+    const res = await devLogin('admin')
+    userStore.setToken(res.token)
+    userStore.setUser(res.user)
+    message.success('开发环境登录成功')
+    router.push('/dashboard')
+  } catch (e) {
+    message.error('开发登录失败：请检查后端 ENABLE_DEV_LOGIN 是否开启')
+  } finally {
+    ssoLoading.value = false
+  }
 }
 </script>
 

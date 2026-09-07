@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # 首次部署时自动建表（create_all）；已存在表不受影响。生产环境建议改用 Alembic 迁移。
     auto_create_tables: bool = False
 
+    # 开发模式直连登录开关：未接公司 SSO 前，允许 /dev-login 签发测试 JWT。
+    # ⚠️ 生产环境对接 SSO 后必须设为 false！
+    enable_dev_login: bool = True
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()] or ["*"]

@@ -59,3 +59,11 @@ export function createAlertRule(data: {
 export function getAuditLogs(params?: { page?: number; size?: number }) {
   return request.get('/v1/system/audit-logs', { params })
 }
+
+/** 开发模式直连登录：调用后端签发真实 JWT（仅 ENABLE_DEV_LOGIN=true 时可用） */
+export function devLogin(role = 'admin') {
+  return request.post<{ token: string; user: { id: string; name: string; role: string; roles: string[] } }>(
+    '/v1/system/dev-login',
+    { role }
+  )
+}
