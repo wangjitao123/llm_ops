@@ -25,15 +25,17 @@
               <a-radio-button :value="30">30 天</a-radio-button>
             </a-radio-group>
           </div>
-          <div class="panel-body">
-            <a-spin :spinning="chartLoading">
-              <a-empty
-                v-if="chartEmpty"
-                :description="chartError ? `趋势图加载失败：${chartError}` : '所选时间范围内暂无 Token 用量数据（可切换 7/30 天）'"
-                style="padding: 60px 0"
-              />
-              <div v-show="!chartEmpty" ref="chartRef" style="height: 300px"></div>
-            </a-spin>
+          <div class="panel-body padless">
+            <div class="chart-stage">
+              <a-spin :spinning="chartLoading">
+                <a-empty
+                  v-if="chartEmpty"
+                  :description="chartError ? `趋势图加载失败：${chartError}` : '所选时间范围内暂无 Token 用量数据（可切换 7/30 天）'"
+                  style="padding: 80px 0"
+                />
+                <div v-show="!chartEmpty" ref="chartRef" style="height: 320px; width: 100%"></div>
+              </a-spin>
+            </div>
           </div>
         </div>
       </a-col>
@@ -158,25 +160,42 @@ async function renderChart() {
     chartEmpty.value = false
     const chart = echarts.init(el)
     chart.setOption({
-      tooltip: { trigger: 'axis' },
-      legend: { data: ['总 Token'], top: 0 },
-      grid: { left: 50, right: 16, top: 32, bottom: 8 },
-      xAxis: { type: 'category', data: stats.points.map((p) => p.date) },
-      yAxis: { type: 'value', name: 'Token' },
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(255,255,255,0.95)',
+        textStyle: { color: '#333' }
+      },
+      grid: { left: 10, right: 10, top: 24, bottom: 24, containLabel: true },
+      xAxis: {
+        type: 'category',
+        data: stats.points.map((p) => p.date.slice(5)), // MM-DD
+        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.4)' } },
+        axisLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
+        axisTick: { show: false }
+      },
+      yAxis: {
+        type: 'value',
+        name: 'Token',
+        nameTextStyle: { color: 'rgba(255,255,255,0.6)' },
+        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.18)', type: 'dashed' } },
+        axisLabel: { color: 'rgba(255,255,255,0.85)' }
+      },
       series: [{
         name: '总 Token',
-        type: 'line',
-        smooth: true,
-        symbolSize: 6,
-        data: stats.points.map((p) => p.total_tokens),
-        lineStyle: { width: 3, color: '#1890ff' },
-        itemStyle: { color: '#1890ff' },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(24,144,255,0.3)' },
-            { offset: 1, color: 'rgba(24,144,255,0)' }
-          ])
-        }
+        type: 'bar',
+        barWidth: '45%',
+        itemStyle: {
+          color: 'rgba(255,255,255,0.32)',
+          borderRadius: [6, 6, 0, 0]
+        },
+        emphasis: { itemStyle: { color: 'rgba(255,255,255,0.55)' } },
+        data: stats.points.map((p, i) => ({
+          value: p.total_tokens,
+          itemStyle: i === stats.points.length - 1
+            ? { color: 'rgba(255,255,255,0.85)', borderRadius: [6, 6, 0, 0] } // 最后一天高亮
+            : undefined
+        }))
       }]
     })
     chartInstance = chart
@@ -209,3 +228,15 @@ onMounted(() => {
   renderChart()
 })
 </script>
+
+<style scoped>
+/* 趋势图舞台：对齐原型 chart-mock 紫蓝渐变 */
+.chart-stage {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  margin: 16px;
+  padding: 8px 16px 4px;
+  min-height: 200px;
+  color: #fff;
+}
+</style>
