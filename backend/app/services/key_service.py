@@ -58,10 +58,10 @@ class KeyService:
         return [await self._to_response(k) for k in keys]
 
     async def update_key(self, key_id: int, data: KeyUpdate, user: str) -> Optional[dict]:
+        # 注意：app_key 表只有 created_by 审计列，没有 updated_by；不能写入
         update_data = data.model_dump(exclude_unset=True, exclude={"model_ids"})
         if data.model_ids is not None:
             await self.repo.set_model_permissions(key_id, data.model_ids)
-        update_data["updated_by"] = user
         key = await self.repo.update_key(key_id, update_data)
         if not key:
             return None
