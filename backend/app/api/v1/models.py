@@ -9,7 +9,7 @@ from app.schemas.common import ApiResponse
 router = APIRouter()
 
 
-@router.get("/", response_model=ApiResponse)
+@router.get("", response_model=ApiResponse)
 async def list_models(
     provider: str = None,
     status: str = None,
@@ -21,7 +21,7 @@ async def list_models(
     return ApiResponse(data=models)
 
 
-@router.post("/", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
 async def create_model(
     data: ModelCreate,
     db: AsyncSession = Depends(get_db),

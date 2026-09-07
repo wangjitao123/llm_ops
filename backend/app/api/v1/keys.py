@@ -8,8 +8,42 @@ from app.schemas.common import ApiResponse
 
 router = APIRouter()
 
+# ============================================================
+# Application endpoints（/api/v1/keys/applications）
+# ⚠️ 必须定义在 /{key_id} 动态路由之前并先 include，
+#    否则 /applications 会被当作 {key_id} 匹配而返回 422。
+# ============================================================
+application_router = APIRouter()
 
-@router.get("/", response_model=ApiResponse)
+
+@application_router.get("", response_model=ApiResponse)
+async def list_applications(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    service = ApplicationService(db)
+    apps = await service.list_all()
+    return ApiResponse(data=apps)
+
+
+@application_router.post("", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
+async def create_application(
+    data: ApplicationCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    service = ApplicationService(db)
+    result = await service.create(data.name, data.description, current_user.get("sub", "system"))
+    return ApiResponse(data=result)
+
+
+router.include_router(application_router, prefix="/applications")
+
+
+# ============================================================
+# Key endpoints（/api/v1/keys）
+# ============================================================
+@router.get("", response_model=ApiResponse)
 async def list_keys(
     status: str = None,
     db: AsyncSession = Depends(get_db),
@@ -20,7 +54,7 @@ async def list_keys(
     return ApiResponse(data=keys)
 
 
-@router.post("/", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
 async def create_key(
     data: KeyCreate,
     db: AsyncSession = Depends(get_db),
@@ -69,28 +103,3 @@ async def delete_key(
     if not deleted:
         raise HTTPException(status_code=404, detail="Key not found")
     return ApiResponse(message="Key deleted")
-
-
-# Application endpoints
-application_router = APIRouter(prefix="/applications")
-
-
-@application_router.get("/", response_model=ApiResponse)
-async def list_applications(
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    service = ApplicationService(db)
-    apps = await service.list_all()
-    return ApiResponse(data=apps)
-
-
-@application_router.post("/", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
-async def create_application(
-    data: ApplicationCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    service = ApplicationService(db)
-    result = await service.create(data.name, data.description, current_user.get("sub", "system"))
-    return ApiResponse(data=result)

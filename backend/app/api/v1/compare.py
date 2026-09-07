@@ -8,7 +8,7 @@ from app.schemas.common import ApiResponse
 router = APIRouter()
 
 
-@router.post("/", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
 async def create_eval(
     name: str,
     model_ids: list[int],
@@ -30,7 +30,7 @@ async def create_eval(
     return ApiResponse(data={"id": result.id, "name": result.name, "status": result.status})
 
 
-@router.get("/", response_model=ApiResponse)
+@router.get("", response_model=ApiResponse)
 async def list_evals(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
