@@ -27,7 +27,11 @@
           </div>
           <div class="panel-body">
             <a-spin :spinning="chartLoading">
-              <a-empty v-if="chartEmpty" description="所选时间范围内暂无 Token 用量数据（可点击右上角切换 7/30 天）" style="padding: 60px 0" />
+              <a-empty
+                v-if="chartEmpty"
+                :description="chartError ? `趋势图加载失败：${chartError}` : '所选时间范围内暂无 Token 用量数据（可切换 7/30 天）'"
+                style="padding: 60px 0"
+              />
               <div v-show="!chartEmpty" ref="chartRef" style="height: 300px"></div>
             </a-spin>
           </div>
@@ -87,6 +91,7 @@ const modelStatusList = ref<ModelItem[]>([])
 const chartLoading = ref(false)
 const chartRef = ref<HTMLDivElement>()
 const chartEmpty = ref(false)
+const chartError = ref('')
 const trendDays = ref<number>(7)
 
 const onlineCount = computed(() => modelStatusList.value.filter((m) => m.status === 'online').length)
@@ -177,6 +182,11 @@ async function renderChart() {
     chartInstance = chart
     resizeHandler = () => chart.resize()
     window.addEventListener('resize', resizeHandler)
+  } catch (e) {
+    // 请求失败：不静默，展示错误原因便于定位
+    console.error('[Dashboard] 趋势图加载失败:', e)
+    chartEmpty.value = true
+    chartError.value = e instanceof Error ? e.message : String(e)
   } finally {
     chartLoading.value = false
   }
