@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.git/
+.gitignore
+*.local
+.env.*
+!.env.production
+Dockerfile
+.dockerignore
+README.md
+src/__tests__/
+coverage/

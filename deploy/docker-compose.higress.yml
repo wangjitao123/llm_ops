@@ -1,0 +1,43 @@
+# ============================================================
+# 大模型监测管理平台 — Higress AI 网关（独立编排）
+#
+# 用法：
+#   1. 按官方 higress-standalone 方式启动 Higress 核心
+#      （nacos / higress-controller / higress-gateway / higress-console），
+#      参考 https://higress.cn/docs/latest/ops/deploy-by-docker-compose/
+#   2. 确保 Higress gateway 与本平台的 compose 网络打通：
+#      docker network connect llm-ops_frontend higress-gateway
+#   3. 在 Higress 控制台 (默认 http://<IP>:8001) 配置 AI 路由，把
+#      /api/v1/* 与模型入口转发到 llm-ops-api 与各模型厂商。
+#
+# 说明：此文件只演示如何把平台服务并入 Higress 网络，
+#       Higress 自身核心容器请使用官方镜像/模板，避免版本漂移。
+# ============================================================
+name: llm-ops-higress
+
+services:
+  # 平台前端与 API 已由主 compose 管理；这里仅声明本平台需要在
+  # Higress 侧暴露的内部端点别名，供控制台配置路由时引用。
+  # 实际运行时无须再次启动这些服务——请勿直接 docker compose up 本文件，
+  # 而是用 network connect 打通后，在 Higress Console 中配置：
+  #
+  #   路由示例（Higress AI 路由）：
+  #     - 名称: platform-web
+  #       域名: * / 主机: <你的域名或IP>
+  #       路径: /            -> 转发到 http://llm-ops-web:80
+  #       路径: /api/v1/*    -> 转发到 http://llm-ops-api:8000
+  #
+  #   模型出口（示例）：
+  #     - 名称: llm-deepseek
+  #       模型: deepseek-chat -> 上游 https://api.deepseek.com
+  #     - 名称: llm-openai
+  #       模型: gpt-4o        -> 上游 https://api.openai.com
+  #
+  # 如需以 OpenAPI 兼容协议统一暴露给外部应用，可将 Higress 网关
+  # 监听端口 (默认 80/8080) 映射到宿主机 8080 后对外。
+  # ============================================================
+
+  # Higress 官方 standalone 部署请参考：
+  # https://github.com/higress-group/higress-standalone
+  # 内含 nacos、higress-controller、higress-gateway、higress-console
+  # 的完整 docker-compose.yml，克隆后按其 README 启动即可。

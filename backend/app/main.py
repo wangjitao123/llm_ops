@@ -11,6 +11,10 @@ async def lifespan(app: FastAPI):
     # Startup
     from app.core.redis import redis_client
     await redis_client.ping()
+    # 首次部署自动建表（由 AUTO_CREATE_TABLES 控制，生产建议迁移工具）
+    if settings.auto_create_tables:
+        from app.core.init_db import init_models
+        await init_models()
     yield
     # Shutdown
     await redis_client.close()

@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # CORS：生产环境必须配置为明确的前端域名（逗号分隔），禁止使用 "*"（凭据模式不支持通配）
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
+    # 首次部署时自动建表（create_all）；已存在表不受影响。生产环境建议改用 Alembic 迁移。
+    auto_create_tables: bool = False
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()] or ["*"]
