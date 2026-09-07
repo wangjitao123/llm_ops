@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api.v1 import models, keys, tokens, gateway, finetune, compare, system
+from app.api.v1 import models, keys, tokens, gateway, finetune, compare, system, proxy
 
 
 @asynccontextmanager
@@ -42,6 +42,7 @@ app.include_router(gateway.router, prefix="/api/v1/gateway", tags=["网关管理
 app.include_router(finetune.router, prefix="/api/v1/finetune", tags=["模型微调"])
 app.include_router(compare.router, prefix="/api/v1/compare", tags=["模型对比"])
 app.include_router(system.router, prefix="/api/v1/system", tags=["系统管理"])
+app.include_router(proxy.router, tags=["OpenAI兼容接口"])
 
 
 @app.get("/health")
