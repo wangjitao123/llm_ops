@@ -20,7 +20,7 @@
 
     <a-row :gutter="[16, 16]" style="margin-top: 16px">
       <a-col :xs="24" :sm="8">
-        <a-card><a-statistic title="总 Token 消耗" :value="totalTokensSafe" :formatter="(v: any) => formatTokenCount(Number(v) || 0)" /></a-card>
+        <a-card><a-statistic title="总 Token 消耗" :value="totalTokensSafe" :formatter="tokenFormatter" /></a-card>
       </a-col>
       <a-col :xs="24" :sm="8">
         <a-card><a-statistic title="总费用" :value="totalCostSafe" :precision="6" prefix="¥" /></a-card>
@@ -65,9 +65,19 @@ const dimensionItems = ref<any[]>([])
 const chartRef = ref<HTMLDivElement>()
 
 const totalRequests = computed(() => stats.value.points.reduce((sum, p) => sum + (p.request_count || 0), 0))
-// Ant Design 的 statistic formatter 有时把对象传给 value，导致 Number(对象)=NaN；这里安全兜底
+// Ant Design 的 statistic formatter 会把对象传给 value，导致 Number(对象)=NaN；这里安全兜底
 const totalTokensSafe = computed(() => stats.value.total_tokens ?? 0)
 const totalCostSafe = computed(() => stats.value.total_cost ?? 0)
+
+/** statistic formatter：兼容 antd 传入 {value} 对象 / 数字 / 字符串 */
+function tokenFormatter(v: unknown): string {
+  let n: number
+  if (typeof v === 'number') n = v
+  else if (typeof v === 'string') n = Number(v)
+  else if (v && typeof v === 'object' && 'value' in v) n = Number((v as { value: unknown }).value)
+  else n = NaN
+  return formatTokenCount(Number.isFinite(n) ? n : 0)
+}
 
 function formatParams() {
   return {
