@@ -1,6 +1,7 @@
 import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock
+from tests.helpers import mock_orm
 from datetime import datetime, timezone
 from app.services.finetune_service import FinetuneService
 from app.schemas.finetune import FinetuneTaskCreate, DatasetCreate
@@ -19,7 +20,7 @@ def finetune_service(mock_db):
 @pytest.mark.asyncio
 async def test_create_finetune_task(finetune_service):
     """Test creating a finetune task."""
-    finetune_service.repo.create_task = AsyncMock(return_value=MagicMock(
+    finetune_service.repo.create_task = AsyncMock(return_value=mock_orm(
         id=1, name="finetune-test", status="pending",
         created_at=datetime.now(timezone.utc),
     ))
@@ -40,7 +41,7 @@ async def test_create_finetune_task(finetune_service):
 @pytest.mark.asyncio
 async def test_get_finetune_task(finetune_service):
     """Test getting a finetune task."""
-    finetune_service.repo.get_task_by_id = AsyncMock(return_value=MagicMock(
+    finetune_service.repo.get_task_by_id = AsyncMock(return_value=mock_orm(
         id=1, name="finetune-test", base_model_id=1, dataset_id=1,
         hyper_params={"learning_rate": 0.0001, "epochs": 3},
         status="running", progress=50, loss_value=0.5, error_message=None,
@@ -61,9 +62,9 @@ async def test_get_finetune_task(finetune_service):
 async def test_list_finetune_tasks(finetune_service):
     """Test listing finetune tasks."""
     finetune_service.repo.get_all_tasks = AsyncMock(return_value=[
-        MagicMock(id=1, name="task-1", status="running", progress=50,
+        mock_orm(id=1, name="task-1", status="running", progress=50,
                   created_at=datetime.now(timezone.utc)),
-        MagicMock(id=2, name="task-2", status="completed", progress=100,
+        mock_orm(id=2, name="task-2", status="completed", progress=100,
                   created_at=datetime.now(timezone.utc)),
     ])
 
@@ -77,7 +78,7 @@ async def test_list_finetune_tasks(finetune_service):
 @pytest.mark.asyncio
 async def test_update_task_status(finetune_service):
     """Test updating finetune task status."""
-    finetune_service.repo.update_task = AsyncMock(return_value=MagicMock(
+    finetune_service.repo.update_task = AsyncMock(return_value=mock_orm(
         id=1, status="running",
     ))
 
@@ -89,7 +90,7 @@ async def test_update_task_status(finetune_service):
 @pytest.mark.asyncio
 async def test_create_dataset(finetune_service):
     """Test creating a dataset."""
-    finetune_service.repo.create_dataset = AsyncMock(return_value=MagicMock(
+    finetune_service.repo.create_dataset = AsyncMock(return_value=mock_orm(
         id=1, name="test-dataset", format="jsonl", version="1.0.0",
         created_at=datetime.now(timezone.utc),
     ))
@@ -105,7 +106,7 @@ async def test_create_dataset(finetune_service):
 async def test_list_datasets(finetune_service):
     """Test listing datasets."""
     finetune_service.repo.get_all_datasets = AsyncMock(return_value=[
-        MagicMock(id=1, name="dataset-1", format="jsonl", sample_count=1000,
+        mock_orm(id=1, name="dataset-1", format="jsonl", sample_count=1000,
                   version="1.0.0", annotation_status="labeled",
                   created_at=datetime.now(timezone.utc)),
     ])
@@ -119,9 +120,12 @@ async def test_list_datasets(finetune_service):
 @pytest.mark.asyncio
 async def test_finetune_state_transitions(finetune_service):
     """Test finetune task state transitions."""
-    finetune_service.repo.update_task = AsyncMock(return_value=MagicMock(
-        id=1, status="completed",
-    ))
+
+    async def fake_update(task_id: int, data: dict):
+        # 返回与传入状态一致的对象，模拟数据库更新结果
+        return mock_orm(id=task_id, status=data["status"])
+
+    finetune_service.repo.update_task = AsyncMock(side_effect=fake_update)
 
     # pending → running
     result_running = await finetune_service.update_task_status(1, "running", "admin")
@@ -139,11 +143,20 @@ async def test_finetune_state_transitions(finetune_service):
     result_cancelled = await finetune_service.update_task_status(1, "cancelled", "admin")
     assert result_cancelled["status"] == "cancelled"
 
+    # 验证状态相关时间戳被正确设置
+    assert finetune_service.repo.update_task.await_count == 4
+    running_call = finetune_service.repo.update_task.await_args_list[0]
+    running_data = running_call.kwargs.get("data") if running_call.kwargs else running_call.args[1]
+    assert "started_at" in running_data  # running 时写入 started_at
+    done_call = finetune_service.repo.update_task.await_args_list[1]
+    done_data = done_call.kwargs.get("data") if done_call.kwargs else done_call.args[1]
+    assert "finished_at" in done_data  # completed 时写入 finished_at
+
 
 @pytest.mark.asyncio
 async def test_default_hyper_params(finetune_service):
     """Test that default hyper parameters are used when not specified."""
-    finetune_service.repo.create_task = AsyncMock(return_value=MagicMock(
+    finetune_service.repo.create_task = AsyncMock(return_value=mock_orm(
         id=1, name="test", status="pending",
         created_at=datetime.now(timezone.utc),
     ))

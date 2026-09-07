@@ -7,7 +7,7 @@ from app.models.model import Model, ModelVersion, ModelHeartbeat
 from app.models.key import Application, AppKey, AppKeyModel
 from app.models.token import ApiRequestLog, TokenStatsHourly, TokenStatsDaily
 from app.models.gateway import RouteRule, RouteRuleModel, RateLimitConfig
-from app.models.finetune import Dataset, FinetuneTask, FinetuneEval
+from app.models.finetune import Dataset, DatasetVersion, FinetuneTask, FinetuneEval
 from app.models.system import (
     SystemConfig,
     AlertRule,
@@ -33,6 +33,7 @@ __all__ = [
     "RouteRuleModel",
     "RateLimitConfig",
     "Dataset",
+    "DatasetVersion",
     "FinetuneTask",
     "FinetuneEval",
     "SystemConfig",

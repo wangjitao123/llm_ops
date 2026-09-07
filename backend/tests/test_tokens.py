@@ -1,6 +1,7 @@
-import pytest
+﻿import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock
+from tests.helpers import mock_orm
 from datetime import date, datetime, timezone, timedelta
 from app.services.token_service import TokenService
 
@@ -19,9 +20,9 @@ def token_service(mock_db):
 async def test_get_daily_stats(token_service):
     """Test getting daily token statistics."""
     mock_stats = [
-        MagicMock(stats_date=date(2025, 1, 1), prompt_tokens=1000, completion_tokens=500,
+        mock_orm(stats_date=date(2025, 1, 1), prompt_tokens=1000, completion_tokens=500,
                   total_tokens=1500, request_count=100, total_cost=0.015),
-        MagicMock(stats_date=date(2025, 1, 2), prompt_tokens=2000, completion_tokens=1000,
+        mock_orm(stats_date=date(2025, 1, 2), prompt_tokens=2000, completion_tokens=1000,
                   total_tokens=3000, request_count=200, total_cost=0.030),
     ]
     token_service.repo.get_daily_stats = AsyncMock(return_value=mock_stats)
@@ -41,10 +42,10 @@ async def test_get_daily_stats(token_service):
 async def test_get_hourly_stats(token_service):
     """Test getting hourly token statistics."""
     mock_stats = [
-        MagicMock(stats_date=date(2025, 1, 1), stats_hour=10,
+        mock_orm(stats_date=date(2025, 1, 1), stats_hour=10,
                   prompt_tokens=500, completion_tokens=250,
                   total_tokens=750, request_count=50, total_cost=0.0075),
-        MagicMock(stats_date=date(2025, 1, 1), stats_hour=11,
+        mock_orm(stats_date=date(2025, 1, 1), stats_hour=11,
                   prompt_tokens=800, completion_tokens=400,
                   total_tokens=1200, request_count=80, total_cost=0.012),
     ]
@@ -110,7 +111,7 @@ async def test_get_cost_report(token_service):
 async def test_stats_with_different_dimensions(token_service):
     """Test stats with different dimension types."""
     token_service.repo.get_daily_stats = AsyncMock(return_value=[
-        MagicMock(stats_date=date(2025, 1, 1), prompt_tokens=100, completion_tokens=50,
+        mock_orm(stats_date=date(2025, 1, 1), prompt_tokens=100, completion_tokens=50,
                   total_tokens=150, request_count=10, total_cost=0.0015),
     ])
 

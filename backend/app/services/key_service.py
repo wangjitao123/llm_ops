@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.key_repo import KeyRepo, ApplicationRepo

@@ -63,3 +63,20 @@ class FinetuneEval(Base):
     latency_after_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     eval_report: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class DatasetVersion(Base):
+    """数据集版本表 - 记录数据集的历史版本（含回退所需文件快照信息）。"""
+
+    __tablename__ = "dataset_version"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    dataset_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("dataset.id"), nullable=False)
+    version: Mapped[str] = mapped_column(String(20), nullable=False)
+    file_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    file_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    sample_count: Mapped[int] = mapped_column(Integer, default=0)
+    file_size: Mapped[int] = mapped_column(BigInteger, default=0)
+    change_log: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

@@ -1,6 +1,7 @@
-import pytest
+﻿import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock
+from tests.helpers import mock_orm
 from datetime import datetime, timezone, date
 from app.services.system_service import SystemService
 from app.schemas.system import SystemConfigCreate, AlertRuleCreate
@@ -20,7 +21,7 @@ def system_service(mock_db):
 async def test_set_config_new(system_service):
     """Test creating a new system config."""
     system_service.repo.get_config = AsyncMock(return_value=None)
-    system_service.repo.set_config = AsyncMock(return_value=MagicMock(
+    system_service.repo.set_config = AsyncMock(return_value=mock_orm(
         config_key="sso.protocol", config_group="sso",
         updated_at=datetime.now(timezone.utc),
     ))
@@ -40,7 +41,7 @@ async def test_set_config_new(system_service):
 @pytest.mark.asyncio
 async def test_get_config(system_service):
     """Test getting a config value."""
-    system_service.repo.get_config = AsyncMock(return_value=MagicMock(
+    system_service.repo.get_config = AsyncMock(return_value=mock_orm(
         config_key="sso.protocol", config_value="oauth2", config_group="sso",
         description="SSO auth protocol",
     ))
@@ -65,8 +66,8 @@ async def test_get_config_not_found(system_service):
 async def test_get_configs_by_group(system_service):
     """Test getting configs by group."""
     system_service.repo.get_configs_by_group = AsyncMock(return_value=[
-        MagicMock(config_key="sso.protocol", config_value="oauth2", config_group="sso"),
-        MagicMock(config_key="sso.authorize_url", config_value="https://sso.company.com/auth",
+        mock_orm(config_key="sso.protocol", config_value="oauth2", config_group="sso"),
+        mock_orm(config_key="sso.authorize_url", config_value="https://sso.company.com/auth",
                   config_group="sso"),
     ])
 
@@ -79,7 +80,7 @@ async def test_get_configs_by_group(system_service):
 @pytest.mark.asyncio
 async def test_create_alert_rule(system_service):
     """Test creating an alert rule."""
-    system_service.repo.create_alert_rule = AsyncMock(return_value=MagicMock(
+    system_service.repo.create_alert_rule = AsyncMock(return_value=mock_orm(
         id=1, name="Daily Token Alert", metric_type="daily_token",
         threshold_value=1000000, enabled=True,
         created_at=datetime.now(timezone.utc),
@@ -102,10 +103,10 @@ async def test_create_alert_rule(system_service):
 async def test_list_alert_rules(system_service):
     """Test listing alert rules."""
     system_service.repo.get_alert_rules = AsyncMock(return_value=[
-        MagicMock(id=1, name="Alert 1", metric_type="daily_token",
+        mock_orm(id=1, name="Alert 1", metric_type="daily_token",
                   threshold_value=1000000, enabled=True,
                   created_at=datetime.now(timezone.utc)),
-        MagicMock(id=2, name="Alert 2", metric_type="monthly_cost",
+        mock_orm(id=2, name="Alert 2", metric_type="monthly_cost",
                   threshold_value=500000, enabled=True,
                   created_at=datetime.now(timezone.utc)),
     ])
@@ -120,7 +121,7 @@ async def test_list_alert_rules(system_service):
 async def test_get_audit_logs(system_service):
     """Test getting audit logs with pagination."""
     system_service.repo.get_audit_logs = AsyncMock(return_value=[
-        MagicMock(id=1, user_id="admin", action_type="key_create",
+        mock_orm(id=1, user_id="admin", action_type="key_create",
                   action_detail='{"key_name": "test"}', target_type="app_key",
                   target_id=1, client_ip="192.168.1.1", result="success",
                   created_at=datetime.now(timezone.utc)),
@@ -154,7 +155,7 @@ async def test_create_audit_log(system_service):
 @pytest.mark.asyncio
 async def test_alert_rule_different_metric_types(system_service):
     """Test creating alert rules with different metric types."""
-    system_service.repo.create_alert_rule = AsyncMock(return_value=MagicMock(
+    system_service.repo.create_alert_rule = AsyncMock(return_value=mock_orm(
         id=1, name="Test", metric_type="daily_token", threshold_value=1000, enabled=True,
         created_at=datetime.now(timezone.utc),
     ))
