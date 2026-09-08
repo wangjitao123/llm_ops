@@ -121,6 +121,28 @@ class ProxyService:
             resp = await client.post(url, json=body, headers=headers)
         return resp
 
+    async def open_stream(
+        self,
+        model: Model,
+        body: dict,
+        timeout: float = 300.0,
+    ) -> tuple[httpx.AsyncClient, httpx.Response]:
+        """流式转发（SSE）：返回 (client, response)，调用方负责在响应结束后关闭两者。"""
+        base = model.api_base_url.rstrip("/")
+        url = f"{base}{CHAT_PATH}"
+        headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+        if model.api_key_encrypted:
+            headers["Authorization"] = f"Bearer {model.api_key_encrypted}"
+
+        client = httpx.AsyncClient(timeout=timeout)
+        try:
+            req = client.build_request("POST", url, json=body, headers=headers)
+            resp = await client.send(req, stream=True)
+            return client, resp
+        except Exception:
+            await client.aclose()
+            raise
+
     async def record_request(
         self,
         *,

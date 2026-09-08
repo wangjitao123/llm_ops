@@ -12,6 +12,7 @@ from typing import Optional
 import httpx
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+from starlette.background import BackgroundTask
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -104,9 +105,50 @@ async def chat_completions(request: Request, db: AsyncSession = Depends(get_db))
             content={"error": {"message": f"Key has no access to model '{model_name}'", "type": "permission_error"}},
         )
 
-    # 5) 转发到模型上游
+    # 5) 转发到模型上游（流式 / 非流式两条路径）
     request_id = f"req_{uuid.uuid4().hex[:16]}"
-    path = f"/v1/chat/completions"
+    path = "/v1/chat/completions"
+
+    # ---- 流式（DSH/客户端 stream:true）：SSE 透传 ----
+    if (body or {}).get("stream"):
+        try:
+            http_client, upstream = await svc.open_stream(model, body)
+        except httpx.TimeoutException:
+            await svc.record_request(request_id=request_id, app_key_id=key.id, model_id=model.id,
+                                     request_path=path, status_code=504, client_ip=client_ip)
+            await db.commit()
+            return JSONResponse(status_code=504, content={"error": {"message": "upstream timeout", "type": "timeout_error"}})
+        except httpx.HTTPError as e:
+            logger_warn(e)
+            await svc.record_request(request_id=request_id, app_key_id=key.id, model_id=model.id,
+                                     request_path=path, status_code=502, client_ip=client_ip)
+            await db.commit()
+            return JSONResponse(status_code=502, content={"error": {"message": "upstream error", "type": "upstream_error"}})
+
+        # 上游错误（如 4xx/5xx JSON）时非 SSE，直接读出并返回 JSON
+        if upstream.status_code >= 400:
+            content_type = upstream.headers.get("content-type", "")
+            if "text/event-stream" not in content_type:
+                try:
+                    err_body = await upstream.aread()
+                finally:
+                    await upstream.aclose()
+                    await http_client.aclose()
+                return JSONResponse(status_code=upstream.status_code, content=err_body)
+
+        await svc.record_request(request_id=request_id, app_key_id=key.id, model_id=model.id,
+                                 request_path=path, response_time_ms=int((time.time() - start) * 1000),
+                                 status_code=upstream.status_code, client_ip=client_ip)
+        await db.commit()
+
+        return StreamingResponse(
+            upstream.aiter_bytes(),
+            status_code=upstream.status_code,
+            media_type=upstream.headers.get("content-type", "text/event-stream"),
+            background=BackgroundTask(_close_stream, http_client, upstream),
+        )
+
+    # ---- 非流式 ----
     try:
         upstream = await svc.forward(model, body)
     except httpx.TimeoutException:
@@ -146,3 +188,11 @@ async def chat_completions(request: Request, db: AsyncSession = Depends(get_db))
 def logger_warn(exc: Exception) -> None:
     import logging
     logging.getLogger(__name__).warning("upstream error: %s", exc)
+
+
+async def _close_stream(client: httpx.AsyncClient, resp: httpx.Response) -> None:
+    """流式响应结束后释放上游连接。"""
+    try:
+        await resp.aclose()
+    finally:
+        await client.aclose()
