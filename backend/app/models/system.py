@@ -84,8 +84,9 @@ class ModelEval(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    model_ids: Mapped[dict] = mapped_column(JSON, nullable=False)
+    model_ids: Mapped[list] = mapped_column(JSON, nullable=False)
     dimension_weights: Mapped[dict] = mapped_column(JSON, default=dict)
+    test_prompts: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")
     result: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     recommendation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

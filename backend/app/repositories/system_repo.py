@@ -68,3 +68,15 @@ class SystemRepo:
         self.db.add(task)
         await self.db.flush()
         return task
+
+    async def update_model_eval(self, eval_id: int, data: dict) -> Optional[ModelEval]:
+        """更新 ModelEval（status / result / recommendation 等）。"""
+        stmt = (
+            update(ModelEval)
+            .where(ModelEval.id == eval_id, ModelEval.deleted_at.is_(None))
+            .values(**data)
+            .returning(ModelEval)
+        )
+        result = await self.db.execute(stmt)
+        await self.db.flush()
+        return result.scalar_one_or_none()

@@ -3,6 +3,7 @@ from sqlalchemy import select, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.gateway import RouteRule, RouteRuleModel, RateLimitConfig
+from app.models.model import Model
 
 
 class GatewayRepo:
@@ -60,3 +61,22 @@ class GatewayRepo:
             select(RateLimitConfig).where(RateLimitConfig.config_key == "default").limit(1)
         )
         return result.scalar_one_or_none()
+
+    async def get_enabled_routes_with_models(self) -> list[RouteRule]:
+        """查询全部启用路由及其目标模型（运行时路由分发用）。
+
+        按 priority 升序 + 创建时间升序返回（priority 越小优先级越高）。
+        """
+        stmt = (
+            select(RouteRule)
+            .where(
+                RouteRule.status == "enabled",
+                RouteRule.deleted_at.is_(None),
+            )
+            .options(
+                joinedload(RouteRule.targets).joinedload(RouteRuleModel.model)
+            )
+            .order_by(RouteRule.priority.asc(), RouteRule.created_at.asc())
+        )
+        result = await self.db.execute(stmt)
+        return list(result.unique().scalars().all())

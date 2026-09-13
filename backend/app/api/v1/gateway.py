@@ -109,8 +109,15 @@ async def sync_route_to_higress(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
+    """同步路由到 Higress。
+
+    当前未启用 Higress：路由由平台内置网关（/v1/chat/completions）直接执行，
+    本端点仅做启用校验，不实际下发到外部网关。
+    """
     service = GatewayService(db)
-    success = await service.sync_to_higress(route_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Sync failed")
-    return ApiResponse(message="Route synced to Higress")
+    route = await service.get_route(route_id)
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+    if route["status"] != "enabled":
+        raise HTTPException(status_code=400, detail="Route is disabled, enable it first")
+    return ApiResponse(message="路由已启用，由平台内置网关执行（Higress 同步未启用）")

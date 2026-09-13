@@ -35,6 +35,7 @@ class RouteRuleModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     route_rule = relationship("RouteRule", back_populates="targets")
+    model = relationship("Model")
 
 
 class RateLimitConfig(Base):

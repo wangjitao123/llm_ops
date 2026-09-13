@@ -56,7 +56,10 @@ class ProxyService:
         return key
 
     async def resolve_model(self, model_name: str) -> Optional[Model]:
-        """按请求 model 名解析目标模型（当前模型在线才可用）。"""
+        """按请求 model 名解析目标模型（当前模型在线才可用）。
+
+        同一 model 名允许注册多个实例（路由分发场景），直连时取 id 最小者。
+        """
         if not model_name:
             return None
         result = await self.db.execute(
@@ -64,7 +67,7 @@ class ProxyService:
                 Model.name == model_name,
                 Model.deleted_at.is_(None),
                 Model.status == "online",
-            )
+            ).order_by(Model.id).limit(1)
         )
         return result.scalar_one_or_none()
 
@@ -150,17 +153,22 @@ class ProxyService:
         app_key_id: Optional[int],
         model_id: Optional[int],
         request_path: str,
+        route_rule_id: Optional[int] = None,
         prompt_tokens: int = 0,
         completion_tokens: int = 0,
         response_time_ms: int = 0,
         status_code: int = 200,
         client_ip: Optional[str] = None,
-    ) -> None:
-        """记录一次网关请求日志（供 Token 统计/审计使用）。"""
+    ) -> ApiRequestLog:
+        """记录一次网关请求日志（供 Token 统计/审计使用）。
+
+        返回已 flush 的日志对象（流式请求需用其 id 在流结束后回填真实 token 用量）。
+        """
         log = ApiRequestLog(
             request_id=request_id,
             app_key_id=app_key_id,
             model_id=model_id,
+            route_rule_id=route_rule_id,
             request_path=request_path,
             request_method="POST",
             prompt_tokens=prompt_tokens,
@@ -173,3 +181,4 @@ class ProxyService:
         )
         self.db.add(log)
         await self.db.flush()
+        return log

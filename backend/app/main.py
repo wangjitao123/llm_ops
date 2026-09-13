@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.api.v1 import models, keys, tokens, gateway, finetune, compare, system, proxy
@@ -33,6 +35,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc: RequestValidationError):
+    """把 FastAPI 422 校验错误转成平台统一的 ApiResponse 格式，前端能看到具体错误原因。"""
+    errors = exc.errors()
+    detail = "; ".join(
+        f"{'.'.join(str(p) for p in e.get('loc', []))}: {e.get('msg', '')}"
+        for e in errors
+    )
+    return JSONResponse(
+        status_code=422,
+        content={"code": 422, "message": f"请求参数校验失败: {detail}"},
+    )
 
 # Register routers
 app.include_router(models.router, prefix="/api/v1/models", tags=["模型管理"])

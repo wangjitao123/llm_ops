@@ -93,17 +93,22 @@ async def _aggregate_hourly(hour_offsets: list[int] | None = None, days_back: in
 
 
 @celery_app.task(name="aggregate_daily_stats")
-def aggregate_daily_stats():
-    """聚合小时统计到天统计（幂等：先删当天再重算）。"""
+def aggregate_daily_stats(days: int = 7):
+    """聚合小时统计到天统计（幂等：先删当天再重算）。
+
+    - 每天 00:10 定时调用（days=7）：重算近 7 天，兜底覆盖可能晚到的小时数据；
+    - 每小时刷新当天（days=1）：把"今天"已聚合的小时数据滚动进 token_stats_daily，
+      使总览大屏/Tok 统计页当天即可看到当日用量（否则当天数据要等次日 00:10 才可见）。
+    """
     import asyncio
-    asyncio.run(_aggregate_daily())
+    asyncio.run(_aggregate_daily(days=days))
 
 
-async def _aggregate_daily():
+async def _aggregate_daily(days: int = 7):
     async with async_session() as session:
-        # 重算近 7 天（覆盖可能晚到的小时数据）
+        # 重算从今天起往回 days 天（含今天）
         today_local = _to_local(datetime.now(timezone.utc)).date()
-        for i in range(7):
+        for i in range(days):
             d = today_local - timedelta(days=i)
             await session.execute(
                 delete(TokenStatsDaily).where(TokenStatsDaily.stats_date == d)
