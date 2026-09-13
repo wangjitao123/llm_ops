@@ -8,7 +8,6 @@
             <a-select-option value="model">按模型</a-select-option>
             <a-select-option value="key">按 Key</a-select-option>
             <a-select-option value="application">按应用</a-select-option>
-            <a-select-option value="user">按用户</a-select-option>
           </a-select>
           <a-range-picker v-model:value="dateRange" />
           <a-select v-model:value="query.granularity" style="width: 100px">
@@ -95,7 +94,8 @@ import {
 import StatCard from '@/components/common/StatCard.vue'
 import { getTokenStats, getTokenSummary, getCostReport } from '@/api/tokenApi'
 import { getModelList } from '@/api/modelApi'
-import type { StatsResponse, ModelItem } from '@/types/api'
+import { getKeyList, getApplicationList } from '@/api/keyApi'
+import type { StatsResponse, ModelItem, KeyItem, ApplicationItem } from '@/types/api'
 import { formatTokenCount } from '@/utils'
 
 const query = reactive<{ dimension_type: string; granularity: 'daily' | 'hourly' }>({ dimension_type: 'model', granularity: 'daily' })
@@ -104,16 +104,25 @@ const stats = ref<StatsResponse>({ dimension_type: 'model', points: [], total_to
 const dimensionItems = ref<any[]>([])
 const chartRef = ref<HTMLDivElement>()
 const modelList = ref<ModelItem[]>([])
+const keyList = ref<KeyItem[]>([])
+const appList = ref<ApplicationItem[]>([])
 
 const totalRequests = computed(() => stats.value.points.reduce((sum, p) => sum + (p.request_count || 0), 0))
 // Ant Design statistic formatter 会把对象传给 value，导致 Number(对象)=NaN；这里安全兜底
 const totalTokensSafe = computed(() => stats.value.total_tokens ?? 0)
 const totalCostSafe = computed(() => stats.value.total_cost ?? 0)
 
-/** 维度 id → 名称：按当前维度类型映射（模型维度显示模型名，其他回退 id） */
+/** 维度 id → 名称：按当前维度类型映射（模型名/Key 名/应用名，取不到回退 id） */
 function dimensionName(id: number): string {
   if (query.dimension_type === 'model') {
     return modelList.value.find((m) => m.id === id)?.name || `#${id}`
+  }
+  if (query.dimension_type === 'key') {
+    const k = keyList.value.find((x) => x.id === id)
+    return k ? `${k.name} (${k.key_prefix}…)` : `#${id}`
+  }
+  if (query.dimension_type === 'application') {
+    return appList.value.find((a) => a.id === id)?.name || `#${id}`
   }
   return `#${id}`
 }
@@ -199,6 +208,12 @@ async function exportReport() {
 onMounted(async () => {
   try {
     modelList.value = (await getModelList()) as ModelItem[]
+  } catch { /* 忽略 */ }
+  try {
+    keyList.value = (await getKeyList({ page: 1, size: 999 })) as KeyItem[]
+  } catch { /* 忽略 */ }
+  try {
+    appList.value = (await getApplicationList()) as ApplicationItem[]
   } catch { /* 忽略 */ }
   loadStats()
 })

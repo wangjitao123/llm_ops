@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock
 from tests.helpers import mock_orm
@@ -109,7 +109,7 @@ async def test_get_cost_report(token_service):
 
 @pytest.mark.asyncio
 async def test_stats_with_different_dimensions(token_service):
-    """Test stats with different dimension types."""
+    """Test stats with supported dimension types（model / application / key）。"""
     token_service.repo.get_daily_stats = AsyncMock(return_value=[
         mock_orm(stats_date=date(2025, 1, 1), prompt_tokens=100, completion_tokens=50,
                   total_tokens=150, request_count=10, total_cost=0.0015),
@@ -121,14 +121,14 @@ async def test_stats_with_different_dimensions(token_service):
     )
     assert result_app["dimension_type"] == "application"
 
-    # Test by user
-    result_user = await token_service.get_stats(
-        "user", "user123", date(2025, 1, 1), date(2025, 1, 1), "daily"
-    )
-    assert result_user["dimension_type"] == "user"
-
     # Test by key
     result_key = await token_service.get_stats(
         "key", 1, date(2025, 1, 1), date(2025, 1, 1), "daily"
     )
     assert result_key["dimension_type"] == "key"
+
+    # Test by model
+    result_model = await token_service.get_stats(
+        "model", 1, date(2025, 1, 1), date(2025, 1, 1), "daily"
+    )
+    assert result_model["dimension_type"] == "model"

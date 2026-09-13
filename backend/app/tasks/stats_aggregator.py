@@ -2,6 +2,7 @@ from datetime import datetime, timezone, timedelta, date
 from celery import shared_task
 from app.tasks.worker import celery_app
 from app.core.database import async_session
+from app.models.key import AppKey
 from app.models.token import TokenStatsHourly, TokenStatsDaily, ApiRequestLog
 from sqlalchemy import select, func, delete
 
@@ -61,6 +62,7 @@ async def _aggregate_hourly(hour_offsets: list[int] | None = None, days_back: in
                 )
             )
 
+            # ---- 按 model 维度聚合 ----
             stmt = select(
                 ApiRequestLog.model_id,
                 func.count().label("request_count"),
@@ -76,7 +78,7 @@ async def _aggregate_hourly(hour_offsets: list[int] | None = None, days_back: in
 
             result = await session.execute(stmt)
             for row in result.all():
-                stats = TokenStatsHourly(
+                session.add(TokenStatsHourly(
                     stats_date=stats_date,
                     stats_hour=stats_hour,
                     dimension_type="model",
@@ -86,8 +88,69 @@ async def _aggregate_hourly(hour_offsets: list[int] | None = None, days_back: in
                     completion_tokens=row.completion_tokens or 0,
                     total_tokens=row.total_tokens or 0,
                     avg_response_ms=int(row.avg_response_ms or 0),
+                ))
+
+            # ---- 按 Key 维度聚合（app_key_id → dimension_type='key'） ----
+            stmt_key = select(
+                ApiRequestLog.app_key_id,
+                func.count().label("request_count"),
+                func.sum(ApiRequestLog.prompt_tokens).label("prompt_tokens"),
+                func.sum(ApiRequestLog.completion_tokens).label("completion_tokens"),
+                func.sum(ApiRequestLog.total_tokens).label("total_tokens"),
+                func.avg(ApiRequestLog.response_time_ms).label("avg_response_ms"),
+            ).where(
+                ApiRequestLog.created_at >= start_utc,
+                ApiRequestLog.created_at < end_utc,
+                ApiRequestLog.app_key_id.isnot(None),
+            ).group_by(ApiRequestLog.app_key_id)
+
+            result_key = await session.execute(stmt_key)
+            for row in result_key.all():
+                session.add(TokenStatsHourly(
+                    stats_date=stats_date,
+                    stats_hour=stats_hour,
+                    dimension_type="key",
+                    dimension_id=row.app_key_id or 0,
+                    request_count=row.request_count,
+                    prompt_tokens=row.prompt_tokens or 0,
+                    completion_tokens=row.completion_tokens or 0,
+                    total_tokens=row.total_tokens or 0,
+                    avg_response_ms=int(row.avg_response_ms or 0),
+                ))
+
+            # ---- 按应用维度聚合（Key → 所属应用；未绑定应用的 Key 不计入） ----
+            stmt_app = (
+                select(
+                    AppKey.application_id,
+                    func.count().label("request_count"),
+                    func.sum(ApiRequestLog.prompt_tokens).label("prompt_tokens"),
+                    func.sum(ApiRequestLog.completion_tokens).label("completion_tokens"),
+                    func.sum(ApiRequestLog.total_tokens).label("total_tokens"),
+                    func.avg(ApiRequestLog.response_time_ms).label("avg_response_ms"),
                 )
-                session.add(stats)
+                .select_from(ApiRequestLog)
+                .join(AppKey, AppKey.id == ApiRequestLog.app_key_id)
+                .where(
+                    ApiRequestLog.created_at >= start_utc,
+                    ApiRequestLog.created_at < end_utc,
+                    AppKey.application_id.isnot(None),
+                )
+                .group_by(AppKey.application_id)
+            )
+
+            result_app = await session.execute(stmt_app)
+            for row in result_app.all():
+                session.add(TokenStatsHourly(
+                    stats_date=stats_date,
+                    stats_hour=stats_hour,
+                    dimension_type="application",
+                    dimension_id=row.application_id or 0,
+                    request_count=row.request_count,
+                    prompt_tokens=row.prompt_tokens or 0,
+                    completion_tokens=row.completion_tokens or 0,
+                    total_tokens=row.total_tokens or 0,
+                    avg_response_ms=int(row.avg_response_ms or 0),
+                ))
 
         await session.commit()
 

@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class TokenStatsQuery(BaseModel):
-    dimension_type: str = Field(..., pattern="^(model|application|key|user)$")
+    dimension_type: str = Field(..., pattern="^(model|application|key)$")
     dimension_id: Optional[int] = None
     start_date: date
     end_date: date
@@ -32,6 +32,6 @@ class TokenStatsResponse(BaseModel):
 class CostReportQuery(BaseModel):
     start_date: date
     end_date: date
-    group_by: str = Field(default="model", pattern="^(model|application|key|user)$")
+    group_by: str = Field(default="model", pattern="^(model|application|key)$")
     export: bool = False
     export_format: str = Field(default="csv", pattern="^(csv|xlsx)$")
