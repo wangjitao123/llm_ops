@@ -126,3 +126,173 @@ export interface DatasetItem {
   created_by: string
   created_at: string
 }
+
+// Quantization types
+export interface QuantizationTask {
+  id: number
+  name: string
+  base_model_id: number | null
+  hf_model_id: string
+  output_name: string | null
+  algorithm: string
+  weight_bits: number
+  activation_bits: number
+  group_size: number
+  calib_samples: number
+  calib_source: string
+  calib_text: string | null
+  output_path: string | null
+  status: string
+  progress: number
+  error_message: string | null
+  result_model_id: number | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+// Deployment types
+export interface DeploymentItem {
+  id: number
+  name: string
+  deploy_type: string
+  status: string
+  base_model_id: number | null
+  hf_model_id: string | null
+  endpoint_url: string
+  engine: string | null
+  gpu_ids: number[] | null
+  gpu_count: number
+  gpu_memory_gb: number | null
+  max_concurrency: number
+  max_input_tokens: number
+  system_prompt: string | null
+  temperature: number | null
+  top_p: number | null
+  max_tokens: number
+  frequency_penalty: number | null
+  tools_json: any[] | null
+  web_search_enabled: boolean
+  web_search_config: any | null
+  env_vars: any | null
+  auto_register: boolean
+  health_check_enabled: boolean
+  error_message: string | null
+  health_rate?: number
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+// ===== 模型压测 =====
+export interface PerfTaskItem {
+  id: number
+  name: string
+  model_id: number | null
+  model_name_snapshot: string | null
+  status: string
+  mode: string
+
+  parallel: number | null
+  number: number | null
+  rate: number | null
+  max_concurrency: number | null
+  duration_limit: number | null
+
+  sla_metric: string | null
+  sla_threshold_ms: number | null
+  sla_lower_bound: number | null
+  sla_upper_bound: number | null
+
+  turns: number | null
+
+  dataset_type: string
+  input_length: number | null
+  output_length: number | null
+  dataset_file: string | null
+
+  stream: boolean
+  temperature: number | null
+  request_timeout: number
+  tokenizer_path: string | null
+
+  target_url: string | null
+  via_gateway: boolean
+  fingerprint: string | null
+
+  progress_sent: number
+  progress_total: number
+  current_rps: number | null
+
+  ttft_mean_ms: number | null
+  ttft_p99_ms: number | null
+  tpot_mean_ms: number | null
+  output_throughput: number | null
+  request_throughput: number | null
+  success_rate: number | null
+  success_count: number | null
+
+  error_message: string | null
+  started_at: string | null
+  finished_at: string | null
+  duration_seconds: number | null
+
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+/** 详情：额外带全量结果与参数快照 */
+export interface PerfTaskDetail extends PerfTaskItem {
+  result_json: Record<string, any> | null
+  params_json: Record<string, any> | null
+}
+
+export interface PerfStats {
+  total: number
+  completed: number
+  running: number
+  latest_ttft_p99_ms: number | null
+}
+
+export interface PerfTestableModel {
+  id: number
+  name: string
+  provider: string
+  status: string
+  api_base_url: string
+  hf_model_id: string | null
+}
+
+export interface PerfCompareItem {
+  task_id: number
+  name: string
+  created_at: string
+  mode: string
+  model_name: string | null
+  parallel: number | null
+  rate: number | null
+  number: number | null
+  dataset_type: string
+  input_length: number | null
+  output_length: number | null
+  stream: boolean
+  fingerprint: string | null
+
+  ttft_mean_ms: number | null
+  ttft_p50_ms: number | null
+  ttft_p90_ms: number | null
+  ttft_p99_ms: number | null
+  tpot_mean_ms: number | null
+  output_throughput: number | null
+  request_throughput: number | null
+  success_rate: number | null
+  duration_seconds: number | null
+}
+
+export interface PerfCompareResult {
+  items: PerfCompareItem[]
+  strictly_comparable: boolean
+  diff_fields: string[]
+  deltas: Record<string, (number | null)[]>
+}

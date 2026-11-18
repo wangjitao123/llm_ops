@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模型量化 - 原型</title>
+<!-- 使用 Ant Design CSS -->
+<link href="https://cdn.jsdelivr.net/npm/ant-design-vue@3/dist/reset.min.css" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+
+/* ========== 整体布局 ========== */
+.layout { display: flex; min-height: 100vh; }
+
+/* ========== 左侧导航 ========== */
+.sidebar { width: 220px; background: #001529; color: #fff; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+.logo { padding: 20px 16px; border-bottom: 1px solid #002140; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 32px; height: 32px; background: #1890ff; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.nav { flex: 1; padding: 8px 0; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 24px; cursor: pointer; color: #ffffffa6; font-size: 14px; transition: all .2s; }
+.nav-item:hover { color: #fff; background: #1890ff14; }
+.nav-item.active { color: #fff; background: #1890ff; }
+.nav-icon { width: 16px; text-align: center; }
+.nav-divider { height: 1px; background: #002140; margin: 8px 16px; }
+
+/* ========== 右侧内容 ========== */
+.main { flex: 1; overflow: auto; }
+.header { background: #fff; padding: 12px 24px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; }
+.breadcrumb { font-size: 13px; color: #8c8c8c; }
+.breadcrumb span { color: #333; }
+.header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: #8c8c8c; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: #1890ff; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; }
+
+.content { padding: 24px; }
+
+/* ========== 卡片与工具条 ========== */
+.page-title { font-size: 20px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
+
+.toolbar { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 2px #0000000a; }
+.filters { display: flex; gap: 12px; align-items: center; }
+.filter-select { padding: 4px 11px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; height: 32px; min-width: 130px; background: #fff; }
+.btn { padding: 4px 15px; border-radius: 6px; font-size: 14px; height: 32px; cursor: pointer; border: 1px solid #d9d9d9; background: #fff; display: inline-flex; align-items: center; gap: 4px; }
+.btn-primary { background: #1890ff; border-color: #1890ff; color: #fff; }
+.btn-primary:hover { background: #40a9ff; }
+
+/* ========== 表格 ========== */
+.table-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 2px #0000000a; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+th { background: #fafafa; font-weight: 500; color: #8c8c8c; font-size: 13px; }
+tr:hover td { background: #fafafa; }
+td:last-child { white-space: nowrap; }
+
+/* ========== 标签、徽章 ========== */
+.tag { display: inline-block; padding: 0 7px; border-radius: 4px; font-size: 12px; line-height: 22px; border: 1px solid; }
+.tag-blue { color: #1890ff; border-color: #1890ff14; background: #e6f7ff; }
+.tag-green { color: #52c41a; border-color: #b7eb8f; background: #f6ffed; }
+.tag-orange { color: #fa8c16; border-color: #ffd591; background: #fff7e6; }
+.tag-red { color: #ff4d4f; border-color: #ffa39e; background: #fff1f0; }
+.tag-grey { color: #8c8c8c; border-color: #d9d9d9; background: #fafafa; }
+
+.status { display: inline-flex; align-items: center; gap: 6px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.status-pending { background: #d9d9d9; }
+.status-queued { background: #1890ff; }
+.status-running { background: #fa8c16; }
+.status-completed { background: #52c41a; }
+.status-failed { background: #ff4d4f; }
+.status-cancelled { background: #8c8c8c; }
+
+.progress { display: flex; align-items: center; gap: 8px; }
+.progress-bar { flex: 1; height: 8px; background: #f5f5f5; border-radius: 10px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 10px; transition: width .3s; }
+.progress-fill-green { background: #52c41a; }
+.progress-fill-orange { background: #fa8c16; }
+.progress-fill-red { background: #ff4d4f; }
+.progress-text { font-size: 12px; color: #8c8c8c; min-width: 32px; }
+
+.ln { color: #1890ff; text-decoration: none; font-size: 14px; cursor: pointer; }
+.ln:hover { color: #40a9ff; }
+.ln-danger { color: #ff4d4f; }
+.ln-danger:hover { color: #ff7875; }
+
+/* ========== 弹窗 ========== */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #00000045; z-index: 1000; align-items: center; justify-content: center; }
+.modal-overlay.show { display: flex; }
+.modal { background: #fff; border-radius: 8px; width: 680px; max-height: 85vh; overflow-y: auto; box-shadow: 0 6px 16px #0000001f; }
+.modal-header { padding: 16px 24px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; font-size: 16px; font-weight: 600; }
+.modal-close { width: 24px; height: 24px; border: none; background: none; font-size: 18px; cursor: pointer; color: #8c8c8c; border-radius: 4px; }
+.modal-close:hover { background: #f5f5f5; }
+.modal-body { padding: 24px; }
+.modal-footer { padding: 12px 24px; border-top: 1px solid #f0f0f0; display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ========== 表单 ========== */
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 14px; margin-bottom: 4px; color: #333; }
+.form-label .required { color: #ff4d4f; margin-left: 2px; }
+.form-row { display: flex; gap: 16px; }
+.form-row .form-group { flex: 1; }
+.form-input { width: 100%; padding: 4px 11px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; height: 32px; outline: none; transition: border .2s; }
+.form-input:focus { border-color: #1890ff; box-shadow: 0 0 0 2px #1890ff14; }
+select.form-input { cursor: pointer; }
+
+/* ========== 详情弹窗 ========== */
+.desc-table { width: 100%; border-collapse: collapse; }
+.desc-table td { padding: 8px 12px; border: 1px solid #f0f0f0; font-size: 14px; }
+.desc-table td:first-child { background: #fafafa; font-weight: 500; width: 120px; color: #8c8c8c; }
+.desc-table tr:last-child td { border-bottom: 1px solid #f0f0f0; }
+
+/* ========== 提示 ========== */
+.alert { padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.alert-info { background: #e6f7ff; border: 1px solid #91d5ff; color: #0050b3; }
+.alert-icon { font-size: 16px; }
+
+/* ========== 动画 ========== */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+.modal { animation: fadeIn .2s; }
+
+/* ========== 导航标签 ========== */
+.tabs { display: flex; gap: 0; border-bottom: 1px solid #f0f0f0; margin-bottom: 16px; }
+.tab { padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; color: #8c8c8c; }
+.tab.active { color: #1890ff; border-bottom-color: #1890ff; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- ========== 侧边导航 ========== -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">🧠</div>
+      <span>LLM Ops 平台</span>
+    </div>
+    <nav class="nav">
+      <div class="nav-item"><span class="nav-icon">📊</span> 总览大屏</div>
+      <div class="nav-item"><span class="nav-icon">🤖</span> 模型管理</div>
+      <div class="nav-item"><span class="nav-icon">🔑</span> Key 管理</div>
+      <div class="nav-item"><span class="nav-icon">📈</span> Token 统计</div>
+      <div class="nav-item"><span class="nav-icon">🚪</span> 统一网关</div>
+      <div class="nav-item"><span class="nav-icon">🔬</span> 模型微调</div>
+      <div class="nav-item"><span class="nav-icon">📊</span> 模型对比</div>
+      <div class="nav-item active"><span class="nav-icon">💡</span> <b>模型量化</b> <span style="margin-left:auto;font-size:11px;background:#1890ff;padding:0 6px;border-radius:4px;">NEW</span></div>
+      <div class="nav-divider"></div>
+      <div class="nav-item"><span class="nav-icon">⚙️</span> 系统管理</div>
+    </nav>
+  </aside>
+
+  <!-- ========== 主内容 ========== -->
+  <div class="main">
+    <div class="header">
+      <div class="breadcrumb">模型量化</div>
+      <div class="header-right">
+        <span>admin</span>
+        <div class="avatar">A</div>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- 页面标题 + 说明 -->
+      <div class="page-title">
+        <span>量化任务管理</span>
+      </div>
+
+      <div class="alert alert-info">
+        <span class="alert-icon">💡</span>
+        <span>将 HuggingFace 模型下载到 GPU 服务器执行量化（GPTQ / AWQ / bitsandbytes），量化完成后自动注册为平台新模型。</span>
+      </div>
+
+      <!-- 工具条 -->
+      <div class="toolbar">
+        <div class="filters">
+          <select class="filter-select">
+            <option>全部状态</option>
+            <option>待提交</option>
+            <option>运行中</option>
+            <option>已完成</option>
+            <option>失败</option>
+          </select>
+          <button class="btn btn-primary">🔍 查询</button>
+        </div>
+        <button class="btn btn-primary" onclick="openCreate()">＋ 创建量化任务</button>
+      </div>
+
+      <!-- 任务列表 -->
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>任务名称</th>
+              <th>基座模型</th>
+              <th>量化方案</th>
+              <th>状态</th>
+              <th>进度</th>
+              <th>创建人</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="taskTable">
+            <!-- 由 JS 渲染 -->
+          </tbody>
+        </table>
+        <div style="padding:12px 16px;text-align:center;color:#8c8c8c;font-size:13px;" id="emptyHint">暂无任务，点击"创建量化任务"开始</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 创建任务弹窗 ========== -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span>创建量化任务</span>
+      <button class="modal-close" onclick="closeCreate()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">任务名称 <span class="required">*</span></label>
+        <input class="form-input" placeholder="如：Qwen2.5-7B GPTQ量化" id="taskName">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">选择平台模型（可选）</label>
+          <select class="form-input" id="baseModel">
+            <option value="">— 不选，直接填 HF 模型 ID —</option>
+            <option value="1">MiniMax-M3-AWQ (minimax)</option>
+            <option value="2">Qwen3.8 (qwen)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">HuggingFace 模型 ID <span class="required">*</span></label>
+          <input class="form-input" placeholder="如：Qwen/Qwen2.5-7B" id="hfModelId">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">量化算法 <span class="required">*</span></label>
+          <select class="form-input" id="algorithm">
+            <option value="gptq">GPTQ（推荐，通用最优）</option>
+            <option value="awq">AWQ（激活感知，精度优）</option>
+            <option value="bitsandbytes">bitsandbytes（轻量快速）</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">权重精度 <span class="required">*</span></label>
+          <select class="form-input" id="weightBits">
+            <option value="2">2 bit（极致压缩）</option>
+            <option value="3">3 bit（折中）</option>
+            <option value="4" selected>4 bit（推荐）</option>
+            <option value="8">8 bit（无损）</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">分组大小 <span class="required">*</span></label>
+          <select class="form-input" id="groupSize">
+            <option value="32">32</option>
+            <option value="64">64</option>
+            <option value="128" selected>128（推荐）</option>
+            <option value="256">256</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">校准样本数</label>
+          <input class="form-input" type="number" value="256" id="calibSamples" style="width:100%">
+        </div>
+        <div class="form-group">
+          <label class="form-label">输出路径（可选）</label>
+          <input class="form-input" placeholder="留空使用默认路径" id="outputPath">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeCreate()">取消</button>
+      <button class="btn btn-primary" onclick="createTask()">创建并提交</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 详情弹窗 ========== -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal" style="width:600px;">
+    <div class="modal-header">
+      <span>量化任务详情</span>
+      <button class="modal-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="detailBody">
+      <table class="desc-table">
+        <tr><td>任务名称</td><td id="dName">-</td></tr>
+        <tr><td>基座模型</td><td id="dModel">-</td></tr>
+        <tr><td>量化算法</td><td id="dAlgo">-</td></tr>
+        <tr><td>精度</td><td id="dPrecision">-</td></tr>
+        <tr><td>分组大小</td><td id="dGroup">-</td></tr>
+        <tr><td>校准样本</td><td id="dCalib">-</td></tr>
+        <tr><td>状态</td><td id="dStatus">-</td></tr>
+        <tr><td>进度</td><td id="dProgress">-</td></tr>
+        <tr><td>输出路径</td><td id="dOutput">-</td></tr>
+        <tr><td>结果模型ID</td><td id="dResultModel">-</td></tr>
+        <tr><td>错误信息</td><td id="dError" style="color:#ff4d4f">-</td></tr>
+        <tr><td>创建人</td><td id="dCreator">-</td></tr>
+        <tr><td>创建时间</td><td id="dCreated">-</td></tr>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeDetail()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== 模拟数据 ==========
+let tasks = [];
+let taskIdCounter = 0;
+
+function createMockTask(name, hf, algo, wBits) {
+  const statuses = ['running', 'completed', 'pending', 'failed', 'queued'];
+  const s = statuses[Math.floor(Math.random() * statuses.length)];
+  return {
+    id: ++taskIdCounter,
+    name,
+    hf_model_id: hf,
+    algorithm: algo,
+    weight_bits: wBits,
+    activation_bits: 16,
+    group_size: 128,
+    calib_samples: 256,
+    output_path: s === 'completed' ? '/models/' + hf.replace('/', '--') + '-q' + wBits + 'a16-' + algo : null,
+    status: s,
+    progress: s === 'completed' ? 100 : s === 'running' ? Math.floor(Math.random() * 70) + 10 : s === 'failed' ? Math.floor(Math.random() * 30) + 10 : 0,
+    error_message: s === 'failed' ? 'CUDA out of memory. Try smaller model or larger group_size.' : null,
+    result_model_id: s === 'completed' ? 5 + Math.floor(Math.random() * 10) : null,
+    created_by: 'admin',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+// 初始示例数据
+tasks = [
+  { id: 1, name: 'Qwen2.5-7B GPTQ量化', hf_model_id: 'Qwen/Qwen2.5-7B-Instruct', algorithm: 'gptq', weight_bits: 4, activation_bits: 16, group_size: 128, calib_samples: 256, output_path: '/models/Qwen--Qwen2.5-7B-Instruct-gptq-w4a16', status: 'completed', progress: 100, error_message: null, result_model_id: 5, created_by: 'admin', created_at: '2026-09-13T10:00:00', updated_at: '2026-09-13T10:35:00' },
+  { id: 2, name: 'Llama3-8B AWQ 4bit', hf_model_id: 'meta-llama/Meta-Llama-3-8B', algorithm: 'awq', weight_bits: 4, activation_bits: 16, group_size: 128, calib_samples: 256, output_path: null, status: 'running', progress: 45, error_message: null, result_model_id: null, created_by: 'admin', created_at: '2026-09-13T10:30:00', updated_at: '2026-09-13T10:55:00' },
+  { id: 3, name: 'CodeLlama-7B bnb', hf_model_id: 'codellama/CodeLlama-7b-hf', algorithm: 'bitsandbytes', weight_bits: 4, activation_bits: 16, group_size: 64, calib_samples: 128, output_path: null, status: 'pending', progress: 0, error_message: null, result_model_id: null, created_by: 'admin', created_at: '2026-09-13T11:00:00', updated_at: '2026-09-13T11:00:00' },
+  { id: 4, name: 'Mistral-7B AWQ 3bit', hf_model_id: 'mistralai/Mistral-7B-v0.3', algorithm: 'awq', weight_bits: 3, activation_bits: 16, group_size: 128, calib_samples: 256, output_path: null, status: 'failed', progress: 15, error_message: 'CUDA out of memory. Try smaller model or larger group_size.', result_model_id: null, created_by: 'admin', created_at: '2026-09-13T09:00:00', updated_at: '2026-09-13T09:12:00' },
+];
+
+const statusMap = {
+  pending: '待提交',
+  queued: '排队中',
+  running: '运行中',
+  completed: '已完成',
+  failed: '失败',
+  cancelled: '已取消',
+};
+const colorMap = {
+  pending: 'grey',
+  queued: 'blue',
+  running: 'orange',
+  completed: 'green',
+  failed: 'red',
+  cancelled: 'grey',
+};
+
+function renderTasks() {
+  const tbody = document.getElementById('taskTable');
+  const empty = document.getElementById('emptyHint');
+  if (tasks.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = tasks.map(t => {
+    const algoLabel = t.algorithm.toUpperCase();
+    const tagClass = colorMap[t.status];
+    const progressColor = t.status === 'completed' ? 'green' : t.status === 'failed' ? 'red' : t.status === 'running' ? 'orange' : 'grey';
+    const actions = [];
+
+    if (t.status === 'pending') {
+      actions.push(`<a class="ln" href="javascript:void(0)" onclick="submitTask(${t.id})">提交执行</a>`);
+    }
+    if (['queued', 'running'].includes(t.status)) {
+      actions.push(`<a class="ln ln-danger" href="javascript:void(0)" onclick="alert('已取消任务: ${t.name}')">取消</a>`);
+    }
+    if (['completed','failed','cancelled'].includes(t.status)) {
+      actions.push(`<a class="ln ln-danger" href="javascript:void(0)" onclick="alert('已删除任务: ${t.name}')">删除</a>`);
+    }
+    actions.unshift(`<a class="ln" href="javascript:void(0)" onclick="viewDetail(${t.id})">详情</a>`);
+
+    return `<tr>
+      <td><b>${t.name}</b></td>
+      <td style="font-size:13px;color:#666;">${t.hf_model_id}</td>
+      <td><span class="tag tag-blue">${algoLabel} W${t.weight_bits}A${t.activation_bits}</span></td>
+      <td><span class="status"><span class="status-dot status-${t.status}"></span>${statusMap[t.status]}</span></td>
+      <td><div class="progress"><div class="progress-bar"><div class="progress-fill progress-fill-${progressColor}" style="width:${t.progress}%"></div></div><span class="progress-text">${t.progress}%</span></div></td>
+      <td style="color:#666;">${t.created_by}</td>
+      <td>${actions.join(' ')}</td>
+    </tr>`;
+  }).join('');
+}
+
+function viewDetail(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('dName').textContent = t.name;
+  document.getElementById('dModel').textContent = t.hf_model_id;
+  document.getElementById('dAlgo').textContent = t.algorithm.toUpperCase();
+  document.getElementById('dPrecision').textContent = `W${t.weight_bits}A${t.activation_bits}`;
+  document.getElementById('dGroup').textContent = t.group_size;
+  document.getElementById('dCalib').textContent = t.calib_samples;
+  document.getElementById('dStatus').innerHTML = `<span class="tag tag-${colorMap[t.status]}">${statusMap[t.status]}</span>`;
+  document.getElementById('dProgress').textContent = t.progress + '%';
+  document.getElementById('dOutput').textContent = t.output_path || '-';
+  document.getElementById('dResultModel').textContent = t.result_model_id ? `模型ID #${t.result_model_id}（已注册）` : '-';
+  document.getElementById('dError').textContent = t.error_message || '-';
+  document.getElementById('dCreator').textContent = t.created_by;
+  document.getElementById('dCreated').textContent = t.created_at;
+  document.getElementById('detailModal').classList.add('show');
+}
+function closeDetail() { document.getElementById('detailModal').classList.remove('show'); }
+
+function openCreate() { document.getElementById('createModal').classList.add('show'); }
+function closeCreate() { document.getElementById('createModal').classList.remove('show'); }
+
+function createTask() {
+  const name = document.getElementById('taskName').value.trim() || '新任务';
+  const hf = document.getElementById('hfModelId').value.trim() || 'Qwen/Qwen2.5-7B';
+  const algo = document.getElementById('algorithm').value;
+  const bits = parseInt(document.getElementById('weightBits').value);
+  closeCreate();
+  const t = {
+    id: ++taskIdCounter,
+    name, hf_model_id: hf,
+    algorithm: algo,
+    weight_bits: bits, activation_bits: 16,
+    group_size: parseInt(document.getElementById('groupSize').value),
+    calib_samples: parseInt(document.getElementById('calibSamples').value) || 256,
+    output_path: null,
+    status: 'pending', progress: 0,
+    error_message: null, result_model_id: null,
+    created_by: 'admin',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  tasks.unshift(t);
+  renderTasks();
+}
+
+function submitTask(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  t.status = 'queued';
+  t.progress = 0;
+  renderTasks();
+}
+
+renderTasks();
+</script>
+</body>
+</html>

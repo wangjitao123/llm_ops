@@ -66,6 +66,8 @@ import {
   GatewayOutlined,
   ExperimentOutlined,
   AreaChartOutlined,
+  BulbOutlined,
+  CloudUploadOutlined,
   SettingOutlined,
   LogoutOutlined
 } from '@ant-design/icons-vue'
@@ -101,7 +103,10 @@ const menuGroups: MenuGroup[] = [
     title: '进阶能力',
     items: [
       { path: '/compare', title: '模型对比评估', icon: AreaChartOutlined },
-      { path: '/finetune', title: '模型微调', icon: ExperimentOutlined }
+      { path: '/finetune', title: '模型微调', icon: ExperimentOutlined },
+      { path: '/quantization', title: '模型量化', icon: BulbOutlined, badge: 'NEW', badgeType: 'info' },
+      { path: '/deploy', title: '模型部署', icon: CloudUploadOutlined, badge: 'NEW', badgeType: 'info' },
+      { path: '/perf', title: '模型压测', icon: DashboardOutlined, badge: 'NEW', badgeType: 'info' }
     ]
   },
   {
@@ -167,6 +172,7 @@ function handleUserMenu({ key }: { key: string }) {
   color: #fff;
 }
 .nav-badge.warn { background: #faad14; }
+.nav-badge.info { background: #1890ff; }
 
 /* 顶栏 */
 .topbar {

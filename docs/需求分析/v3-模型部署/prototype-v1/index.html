@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>模型部署 - 原型 v1</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; }
+    .app-layout { display: flex; min-height: 100vh; }
+    .sidebar { width: 240px; background: #001529; color: #fff; flex-shrink: 0; display: flex; flex-direction: column; }
+    .sidebar-logo { padding: 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-logo h2 { font-size: 18px; font-weight: 700; }
+    .sidebar-logo small { font-size: 11px; opacity: 0.6; }
+    .sidebar-nav { flex: 1; padding: 8px 0; overflow-y: auto; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 12px 20px; cursor: pointer; color: rgba(255,255,255,0.65); transition: all 0.2s; border-left: 3px solid transparent; }
+    .nav-item:hover { color: #fff; background: rgba(255,255,255,0.08); }
+    .nav-item.active { color: #fff; background: #1890ff; border-left-color: #1890ff; }
+    .nav-item i { font-size: 18px; width: 20px; text-align: center; }
+    .nav-item .badge { margin-left: auto; }
+    .nav-section-title { padding: 12px 20px 4px; font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.35); letter-spacing: 1px; }
+    .main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .topbar { height: 56px; background: #fff; border-bottom: 1px solid #e8e8e8; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
+    .topbar h5 { font-size: 16px; font-weight: 600; margin: 0; }
+    .topbar-right { display: flex; align-items: center; gap: 16px; }
+    .topbar-right .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: #1890ff; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .content { flex: 1; padding: 24px; overflow-y: auto; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .stat-card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .stat-card .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+    .stat-card .stat-value { font-size: 28px; font-weight: 700; line-height: 1.2; }
+    .stat-card .stat-label { font-size: 13px; color: #8c8c8c; margin-top: 4px; }
+    .table-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .table-card .card-header { padding: 16px 20px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; }
+    .table-card .card-body { padding: 0; }
+    .table-card table { margin: 0; }
+    .table-card th { background: #fafafa; font-weight: 600; font-size: 13px; color: #595959; }
+    .table-card td { vertical-align: middle; }
+    .status-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+    .status-running { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+    .status-stopped { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; }
+    .status-warning { background: #fffbe6; color: #faad14; border: 1px solid #ffe58f; }
+    .status-deploying { background: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
+    .status-failed { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; }
+    .form-card { background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.45); z-index: 1050; justify-content: center; align-items: flex-start; padding-top: 60px; }
+    .modal-overlay.show { display: flex; }
+    .modal-dialog { width: 720px; max-width: 90vw; max-height: 85vh; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.2); display: flex; flex-direction: column; overflow: hidden; }
+    .modal-header { padding: 16px 24px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; }
+    .modal-body { padding: 24px; overflow-y: auto; flex: 1; }
+    .modal-footer { padding: 12px 24px; border-top: 1px solid #f0f0f0; display: flex; justify-content: flex-end; gap: 8px; }
+    .proto-badge { position: fixed; bottom: 12px; right: 12px; background: #722ed1; color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 12px; z-index: 9999; opacity: 0.8; pointer-events: none; }
+    .log-box { background: #1a1a2e; color: #d4d4d4; border-radius: 8px; padding: 14px; font-family: 'Consolas', monospace; font-size: 13px; line-height: 1.7; max-height: 260px; overflow-y: auto; }
+    .log-box .log-time { color: #6a9955; }
+    .log-box .log-info { color: #569cd6; }
+    .log-box .log-err { color: #f44747; }
+    .log-box .log-ok { color: #52c41a; }
+    .log-box .log-warn { color: #dcdcaa; }
+    .gpu-meter { background: #f5f5f5; border-radius: 6px; padding: 12px; }
+    .gpu-meter .progress { height: 8px; border-radius: 4px; }
+    .gpu-meter .progress-bar { background: linear-gradient(90deg, #52c41a, #faad14, #ff4d4f); }
+    .template-tag { cursor: pointer; display: inline-block; padding: 4px 12px; border-radius: 14px; font-size: 12px; border: 1px solid #d9d9d9; background: #fafafa; margin: 0 4px 8px 0; }
+    .template-tag:hover { border-color: #1890ff; color: #1890ff; }
+    .template-tag.recommend { background: #e6f7ff; border-color: #91d5ff; color: #1890ff; }
+    .engine-card { border: 1px solid #f0f0f0; border-radius: 8px; padding: 16px; cursor: pointer; transition: all 0.2s; }
+    .engine-card:hover { border-color: #1890ff; box-shadow: 0 0 0 2px rgba(24,144,255,0.15); }
+    .engine-card.selected { border-color: #1890ff; background: #e6f7ff; }
+    .engine-card .engine-name { font-weight: 600; font-size: 15px; }
+    .engine-card .engine-desc { font-size: 12px; color: #8c8c8c; margin-top: 2px; }
+    @media (max-width: 768px) {
+      .sidebar { width: 60px; }
+      .sidebar-logo h2, .sidebar-logo small, .nav-item span, .nav-section-title, .sidebar .badge { display: none; }
+      .nav-item { justify-content: center; padding: 12px; }
+      .nav-item i { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <!-- Sidebar (same style as v2 prototype) -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <h2><i class="bi bi-cpu me-2"></i>AI 网关</h2>
+      <small>大模型监测管理平台</small>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-item" data-page="dashboard" onclick="switchPage('dashboard')">
+        <i class="bi bi-grid-1x2"></i><span>总览大屏</span>
+      </div>
+      <div class="nav-section-title">核心管理</div>
+      <div class="nav-item" data-page="models" onclick="switchPage('models')">
+        <i class="bi bi-box"></i><span>模型管理</span>
+        <span class="badge bg-success rounded-pill">6</span>
+      </div>
+      <div class="nav-item" data-page="keys" onclick="switchPage('keys')">
+        <i class="bi bi-key"></i><span>Key 管理</span>
+      </div>
+      <div class="nav-item" onclick="switchPage('tokens')">
+        <i class="bi bi-bar-chart"></i><span>Token 统计</span>
+      </div>
+      <div class="nav-item" data-page="gateway" onclick="switchPage('gateway')">
+        <i class="bi bi-router"></i><span>统一网关</span>
+      </div>
+      <div class="nav-section-title">进阶能力</div>
+      <div class="nav-item" data-page="compare" onclick="switchPage('compare')">
+        <i class="bi bi-activity"></i><span>模型对比评估</span>
+      </div>
+      <div class="nav-item" data-page="finetune" onclick="switchPage('finetune')">
+        <i class="bi bi-magic"></i><span>模型微调</span>
+      </div>
+      <div class="nav-item active" data-page="deploy" onclick="switchPage('deploy')">
+        <i class="bi bi-cloud-arrow-up"></i><span>模型部署</span>
+        <span class="badge bg-info rounded-pill">NEW</span>
+      </div>
+      <div class="nav-section-title">系统管理</div>
+      <div class="nav-item" data-page="system" onclick="switchPage('system')">
+        <i class="bi bi-gear"></i><span>系统配置</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Area -->
+  <div class="main-area">
+    <div class="topbar">
+      <h5 id="pageTitle">模型部署</h5>
+      <div class="topbar-right">
+        <span style="font-size:13px;color:#8c8c8c"><i class="bi bi-gpu-card me-1"></i>GPU: 8/8 可用 · 48GB/张</span>
+        <div class="user-avatar" title="管理员">管</div>
+      </div>
+    </div>
+    <div class="content">
+
+      <!-- ========== DEPLOYMENT LIST PAGE ========== -->
+      <div class="page active" id="page-deploy">
+        <!-- 统计卡片 -->
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <div class="stat-card d-flex align-items-center gap-3">
+              <div class="stat-icon" style="background:#e6f7ff;color:#1890ff"><i class="bi bi-cloud-arrow-up"></i></div>
+              <div>
+                <div class="stat-value">4</div>
+                <div class="stat-label">已部署模型</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card d-flex align-items-center gap-3">
+              <div class="stat-icon" style="background:#f6ffed;color:#52c41a"><i class="bi bi-play-circle"></i></div>
+              <div>
+                <div class="stat-value">3</div>
+                <div class="stat-label">运行中</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card d-flex align-items-center gap-3">
+              <div class="stat-icon" style="background:#fffbe6;color:#faad14"><i class="bi bi-cpu"></i></div>
+              <div>
+                <div class="stat-value">26.4/192</div>
+                <div class="stat-label">GPU 已用/总计 (GB)</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card d-flex align-items-center gap-3">
+              <div class="stat-icon" style="background:#fff2f0;color:#ff4d4f"><i class="bi bi-exclamation-triangle"></i></div>
+              <div>
+                <div class="stat-value">0</div>
+                <div class="stat-label">异常部署</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 工具条 -->
+        <div class="form-card mb-3" style="padding:12px 20px;">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <select class="form-select form-select-sm" style="width:140px">
+                <option>全部状态</option>
+                <option>运行中</option>
+                <option>已停止</option>
+                <option>部署中</option>
+              </select>
+            </div>
+            <div class="col-auto">
+              <select class="form-select form-select-sm" style="width:140px">
+                <option>全部引擎</option>
+                <option>vLLM</option>
+                <option>TGI</option>
+                <option>SGLang</option>
+              </select>
+            </div>
+            <div class="col">
+              <input class="form-control form-control-sm" style="max-width:200px" placeholder="搜索模型名称..." />
+            </div>
+            <div class="col-auto ms-auto">
+              <button class="btn btn-primary btn-sm" onclick="showCreateModal()">
+                <i class="bi bi-plus-lg"></i> 新建部署
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 部署列表 -->
+        <div class="table-card">
+          <div class="card-header">
+            <span>已部署模型 <small class="text-muted">共 4 个</small></span>
+          </div>
+          <div class="card-body">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th style="width:18%">部署名称</th>
+                  <th style="width:14%">基座模型</th>
+                  <th style="width:8%">引擎</th>
+                  <th style="width:10%">状态</th>
+                  <th style="width:10%">GPU 用量</th>
+                  <th style="width:10%">QPS</th>
+                  <th style="width:10%">已运行</th>
+                  <th style="width:20%">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><a href="#" onclick="showDetailModal('Qwen2.5-7B')" class="text-decoration-none fw-medium">Qwen2.5-7B-GPTQ</a></td>
+                  <td><span class="text-muted small">Qwen/Qwen2.5-7B-Instruct</span></td>
+                  <td><span class="badge bg-dark">vLLM</span></td>
+                  <td><span class="status-badge status-running">运行中</span></td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div class="progress flex-grow-1" style="width:60px"><div class="progress-bar" style="width:28%"></div></div>
+                      <small>13.4G</small>
+                    </div>
+                  </td>
+                  <td><span class="badge bg-light text-dark">8.2</span></td>
+                  <td><small class="text-muted">3h 24m</small></td>
+                  <td>
+                    <div class="btn-group btn-group-sm" role="group">
+                      <button class="btn btn-outline-secondary" title="停止"><i class="bi bi-stop-fill"></i></button>
+                      <button class="btn btn-outline-secondary" title="重启"><i class="bi bi-arrow-clockwise"></i></button>
+                      <button class="btn btn-outline-secondary" title="监控"><i class="bi bi-graph-up"></i></button>
+                      <div class="dropdown d-inline">
+                        <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><a href="#" onclick="showDetailModal('DeepSeek-R1')" class="text-decoration-none fw-medium">DeepSeek-R1-Distill</a></td>
+                  <td><span class="text-muted small">deepseek-ai/DeepSeek-R1-Distill-Qwen-7B</span></td>
+                  <td><span class="badge bg-dark">vLLM</span></td>
+                  <td><span class="status-badge status-running">运行中</span></td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div class="progress flex-grow-1" style="width:60px"><div class="progress-bar" style="width:30%"></div></div>
+                      <small>14.2G</small>
+                    </div>
+                  </td>
+                  <td><span class="badge bg-light text-dark">5.1</span></td>
+                  <td><small class="text-muted">6h 10m</small></td>
+                  <td>
+                    <div class="btn-group btn-group-sm" role="group">
+                      <button class="btn btn-outline-secondary" title="停止"><i class="bi bi-stop-fill"></i></button>
+                      <button class="btn btn-outline-secondary" title="重启"><i class="bi bi-arrow-clockwise"></i></button>
+                      <button class="btn btn-outline-secondary" title="监控"><i class="bi bi-graph-up"></i></button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><a href="#" onclick="showDetailModal('Qwen-Coder')" class="text-decoration-none fw-medium">Qwen2.5-Coder-7B-AWQ</a></td>
+                  <td><span class="text-muted small">Qwen/Qwen2.5-Coder-7B-Instruct</span></td>
+                  <td><span class="badge bg-dark">vLLM</span></td>
+                  <td><span class="status-badge status-running">运行中</span></td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div class="progress flex-grow-1" style="width:60px"><div class="progress-bar" style="width:26%"></div></div>
+                      <small>12.6G</small>
+                    </div>
+                  </td>
+                  <td><span class="badge bg-light text-dark">2.3</span></td>
+                  <td><small class="text-muted">1d 2h</small></td>
+                  <td><div class="btn-group btn-group-sm"><button class="btn btn-outline-secondary"><i class="bi bi-stop-fill"></i></button><button class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i></button><button class="btn btn-outline-secondary"><i class="bi bi-graph-up"></i></button></div></td>
+                </tr>
+                <tr class="table-warning">
+                  <td><a href="#" onclick="showDetailModal('Test-7B')" class="text-decoration-none fw-medium">Test-7B-GPTQ</a></td>
+                  <td><span class="text-muted small">test/Test-7B</span></td>
+                  <td><span class="badge bg-dark">TGI</span></td>
+                  <td><span class="status-badge status-deploying">部署中</span></td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div class="progress flex-grow-1" style="width:60px">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:65%"></div>
+                      </div>
+                      <small>65%</small>
+                    </div>
+                  </td>
+                  <td><span class="badge bg-light text-muted">-</span></td>
+                  <td><small class="text-muted">--</small></td>
+                  <td><div class="btn-group btn-group-sm"><button class="btn btn-outline-secondary" disabled><i class="bi bi-stop-fill"></i></button><button class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i></button></div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- GPU 资源池 -->
+        <div class="row g-3 mt-3">
+          <div class="col-md-8">
+            <div class="table-card">
+              <div class="card-header"><span><i class="bi bi-cpu me-1"></i> GPU 资源拓扑（8×L20 48GB）</span></div>
+              <div class="card-body p-3">
+                <div class="row g-2">
+                  <div class="col-3" style="margin-bottom:12px">
+                    <div class="gpu-meter">
+                      <div class="d-flex justify-content-between"><span class="fw-semibold">GPU 0</span><small class="text-muted">47.8G/48G</small></div>
+                      <div class="progress mt-1"><div class="progress-bar" style="width:99%;background:#ff4d4f"></div></div>
+                      <small class="text-muted">Qwen2.5-7B-GPTQ (13.4G) + DeepSeek-R1 (14.2G) + 缓存</small>
+                    </div>
+                  </div>
+                  <div class="col-3" style="margin-bottom:12px">
+                    <div class="gpu-meter">
+                      <div class="d-flex justify-content-between"><span class="fw-semibold">GPU 1</span><small class="text-muted">12.6G/48G</small></div>
+                      <div class="progress mt-1"><div class="progress-bar" style="width:26%"></div></div>
+                      <small class="text-muted">Qwen2.5-Coder-7B-AWQ</small>
+                    </div>
+                  </div>
+                  <div class="col-3" style="margin-bottom:12px">
+                    <div class="gpu-meter">
+                      <div class="d-flex justify-content-between"><span class="fw-semibold">GPU 2</span><small class="text-muted">0.2G/48G</small></div>
+                      <div class="progress mt-1"><div class="progress-bar" style="width:1%"></div></div>
+                      <small class="text-muted">空闲</small>
+                    </div>
+                  </div>
+                  <div class="col-3" style="margin-bottom:12px">
+                    <div class="gpu-meter">
+                      <div class="d-flex justify-content-between"><span class="fw-semibold">GPU 3-7</span><small class="text-muted">均 0G/48G</small></div>
+                      <div class="progress mt-1"><div class="progress-bar" style="width:0%"></div></div>
+                      <small class="text-muted">5 卡空闲</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="stat-card d-flex align-items-center gap-3" style="height:100%;padding:16px">
+              <div class="flex-grow-1">
+                <div class="d-flex justify-content-between"><span class="fw-semibold">部署建议</span><span class="badge bg-info" style="font-size:11px">AI 推荐</span></div>
+                <hr style="margin:8px 0" />
+                <div style="font-size:13px;">
+                  <div><i class="bi bi-check-circle text-success me-1"></i> 剩余 GPU: 5 卡 · 240 GB</div>
+                  <div class="mt-1"><i class="bi bi-check-circle text-success me-1"></i> 可部署约 12 个 7B 量化模型</div>
+                  <div class="mt-1"><i class="bi bi-lightbulb text-warning me-1"></i> 建议下一部署分配到 GPU 3</div>
+                  <button class="btn btn-outline-primary btn-sm mt-2" onclick="showCreateModal()">+ 快速部署</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- .content -->
+  </div><!-- .main-area -->
+</div><!-- .app-layout -->
+
+<!-- ========== CREATE DEPLOYMENT MODAL ========== -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h6 class="mb-0 fw-bold">新建模型部署</h6>
+      <button class="btn-close" onclick="hideCreateModal()"></button>
+    </div>
+    <div class="modal-body">
+      <!-- 快速模板 -->
+      <div style="background:#fafafa;border-radius:8px;padding:12px;border:1px solid #f0f0f0;margin-bottom:16px">
+        <small class="text-muted">⚡ 快速模板</small>
+        <div style="margin-top:4px">
+          <span class="template-tag recommend" onclick="fillTemplate('7B-GPTQ')">7B GPTQ 量化 · 单卡</span>
+          <span class="template-tag" onclick="fillTemplate('7B-AWQ')">7B AWQ 量化 · 单卡</span>
+          <span class="template-tag" onclick="fillTemplate('14B')">14B AWQ · 双卡 TP</span>
+          <span class="template-tag" onclick="fillTemplate('32B')">32B GPTQ · 4 卡 TP</span>
+          <span class="template-tag" onclick="fillTemplate('72B')">72B AWQ · 全卡 TP</span>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label fw-medium">模型来源 <span class="text-danger">*</span></label>
+          <div class="d-flex gap-3">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="sourceType" id="srcQuant" checked onchange="toggleSource()" />
+              <label class="form-check-label" for="srcQuant">量化完成后部署</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="sourceType" id="srcHF" onchange="toggleSource()" />
+              <label class="form-check-label" for="srcHF">HuggingFace 模型</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="sourceType" id="srcLocal" onchange="toggleSource()" />
+              <label class="form-check-label" for="srcLocal">本地上传</label>
+            </div>
+          </div>
+        </div>
+        <div class="col-12" id="srcQuantField">
+          <label class="form-label fw-medium">选择已量化模型</label>
+          <select class="form-select">
+            <option>Qwen2.5-7B-GPTQ-W4A16 (13.4GB) - 来自量化任务 #12</option>
+            <option>Qwen2.5-7B-AWQ-W4A16 (12.1GB) - 来自量化任务 #15</option>
+            <option>Test-7B-GPTQ-W4A16 (11.8GB) - 来自量化任务 #18 (部署中)</option>
+          </select>
+        </div>
+        <div class="col-12" id="srcHFField" style="display:none">
+          <label class="form-label fw-medium">HuggingFace 模型 ID</label>
+          <input class="form-control" placeholder="如: Qwen/Qwen2.5-7B-Instruct" />
+        </div>
+        <div class="col-12" id="srcLocalField" style="display:none">
+          <label class="form-label fw-medium">上传模型文件</label>
+          <div style="border:2px dashed #d9d9d9;border-radius:8px;padding:32px;text-align:center;background:#fafafa">
+            <i class="bi bi-upload" style="font-size:32px;color:#8c8c8c"></i>
+            <p class="mt-2 mb-0 text-muted small">拖拽或点击选择 safetensors 模型文件</p>
+            <button class="btn btn-outline-primary btn-sm mt-2">选择文件</button>
+          </div>
+        </div>
+
+        <div class="col-6">
+          <label class="form-label fw-medium mt-2">部署名称</label>
+          <input class="form-control" placeholder="如: qwen2.5-7b-gptq-v1" value="qwen2.5-7b-gptq-v1" />
+        </div>
+        <div class="col-6">
+          <label class="form-label fw-medium mt-2">推理引擎 <span class="text-danger">*</span></label>
+          <div class="d-flex gap-2">
+            <div class="engine-card flex-fill selected" data-engine="vllm" onclick="selectEngine(this)">
+              <div class="engine-name">vLLM</div>
+              <div class="engine-desc">推荐 · GPTQ/AWQ 兼容</div>
+            </div>
+            <div class="engine-card flex-fill" data-engine="tgi" onclick="selectEngine(this)">
+              <div class="engine-name">TGI</div>
+              <div class="engine-desc">HuggingFace 官方</div>
+            </div>
+            <div class="engine-card flex-fill" data-engine="sglang" onclick="selectEngine(this)">
+              <div class="engine-name">SGLang</div>
+              <div class="engine-desc">新兴高性能引擎</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-6">
+          <label class="form-label fw-medium">GPU 分配</label>
+          <div class="d-flex gap-2">
+            <select class="form-select" style="width:100px">
+              <option>1 卡</option>
+              <option>2 卡 TP</option>
+              <option>4 卡 TP</option>
+            </select>
+            <select class="form-select">
+              <option>自动选择</option>
+              <option>GPU 3</option>
+              <option>GPU 4</option>
+              <option>GPU 3-4</option>
+              <option>自定义</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-3">
+          <label class="form-label fw-medium">最大并发</label>
+          <input class="form-control" value="32" />
+        </div>
+        <div class="col-3">
+          <label class="form-label fw-medium">最大输入 Token</label>
+          <input class="form-control" value="4096" />
+        </div>
+
+        <div class="col-12">
+          <hr />
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="autoRegister" checked />
+            <label class="form-check-label" for="autoRegister">部署完成后自动注册到「模型管理」，可通过网关调用</label>
+          </div>
+          <div class="form-check mt-1">
+            <input class="form-check-input" type="checkbox" id="healthCheck" checked />
+            <label class="form-check-label" for="healthCheck">启用健康检查（每 30s 自动检测端点状态）</label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline-secondary" onclick="hideCreateModal()">取消</button>
+      <button class="btn btn-primary" onclick="hideCreateModal();alert('部署任务已提交！\n预计准备时间: 2-5 分钟')">
+        <i class="bi bi-cloud-arrow-up me-1"></i> 开始部署
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== DETAIL MODAL ========== -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-dialog" style="width:800px">
+    <div class="modal-header">
+      <h6 class="mb-0 fw-bold">部署详情 - <span id="detailTitle">Qwen2.5-7B-GPTQ</span></h6>
+      <button class="btn-close" onclick="hideDetailModal()"></button>
+    </div>
+    <div class="modal-body">
+      <!-- Tabs -->
+      <ul class="nav nav-tabs mb-3">
+        <li class="nav-item"><a class="nav-link active" href="#" onclick="event.preventDefault()">概览信息</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="event.preventDefault()">运行日志</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="event.preventDefault()">监控指标</a></li>
+      </ul>
+
+      <!-- Overview -->
+      <div class="row g-3">
+        <div class="col-6">
+          <table class="table table-sm table-borderless">
+            <tr><td class="text-muted" style="width:100px">部署名称</td><td class="fw-medium">qwen2.5-7b-gptq-v1</td></tr>
+            <tr><td class="text-muted">基座模型</td><td>Qwen/Qwen2.5-7B-Instruct</td></tr>
+            <tr><td class="text-muted">推理引擎</td><td>vLLM 0.6.0</td></tr>
+            <tr><td class="text-muted">量化精度</td><td><span class="badge bg-secondary">W4A16 GPTQ</span></td></tr>
+            <tr><td class="text-muted">GPU 分配</td><td>GPU 0（13.4GB）</td></tr>
+            <tr><td class="text-muted">状态</td><td><span class="status-badge status-running">运行中</span></td></tr>
+            <tr><td class="text-muted">运行时长</td><td>3 小时 24 分</td></tr>
+          </table>
+        </div>
+        <div class="col-6">
+          <table class="table table-sm table-borderless">
+            <tr><td class="text-muted" style="width:100px">API 端点</td><td><code>http://10.51.13.7:31100/v1/chat/completions</code><button class="btn btn-sm btn-outline-secondary ms-2" onclick="navigator.clipboard?.writeText('http://10.51.13.7:31100/v1/chat/completions')"><i class="bi bi-files"></i></button></td></tr>
+            <tr><td class="text-muted">模型注册</td><td><span class="badge bg-success">已注册</span> → <a href="#">模型管理</a></td></tr>
+            <tr><td class="text-muted">QPS</td><td>8.2</td></tr>
+            <tr><td class="text-muted">P50 延迟</td><td>342ms</td></tr>
+            <tr><td class="text-muted">P99 延迟</td><td>1.2s</td></tr>
+            <tr><td class="text-muted">当前请求</td><td>12 (排队: 0)</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Logs (simulated) -->
+      <div style="margin-top:12px">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <small class="text-muted fw-medium">最近日志</small>
+          <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> 刷新</button>
+        </div>
+        <div class="log-box">
+          <div><span class="log-time">[10:30:01]</span> <span class="log-info">INFO</span> Starting vLLM server...</div>
+          <div><span class="log-time">[10:30:03]</span> <span class="log-info">INFO</span> Loading model Qwen/Qwen2.5-7B-Instruct with quantization GPTQ...</div>
+          <div><span class="log-time">[10:31:15]</span> <span class="log-info">INFO</span> Model loaded, memory: 13.4GB / 48GB</div>
+          <div><span class="log-time">[10:31:20]</span> <span class="log-info">INFO</span> Starting HTTP server on port 31100</div>
+          <div><span class="log-time">[10:31:22]</span> <span class="log-ok">OK</span> Server ready. Serving GPTQ model at http://0.0.0.0:31100</div>
+          <div><span class="log-time">[10:31:25]</span> <span class="log-info">INFO</span> Registered model 'qwen2.5-7b-gptq-v1' in platform model management</div>
+          <div><span class="log-time">[10:31:28]</span> <span class="log-info">INFO</span> Health check started (interval: 30s)</div>
+          <div><span class="log-time">[12:01:03]</span> <span class="log-info">INFO</span> Health check: OK, uptime 1h 30m</div>
+          <div><span class="log-time">[13:31:03]</span> <span class="log-info">INFO</span> QPS peak: 12.4 at 13:20</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline-danger btn-sm"><i class="bi bi-stop-fill"></i> 停止部署</button>
+      <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-clockwise"></i> 重启</button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="hideDetailModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="proto-badge">原型 v1 · 静态示意</div>
+
+<script>
+// Page switching
+function switchPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const p = document.getElementById('page-' + page);
+  if (p) p.classList.add('active');
+  const nav = document.querySelector(`.nav-item[data-page="${page}"]`);
+  if (nav) nav.classList.add('active');
+  document.getElementById('pageTitle').textContent = {
+    deploy: '模型部署',
+    dashboard: '总览大屏', models: '模型管理', keys: 'Key 管理',
+    tokens: 'Token 统计', gateway: '统一网关', compare: '模型对比评估',
+    finetune: '模型微调', system: '系统配置'
+  }[page] || '模型部署';
+}
+
+// Create modal
+function showCreateModal() { document.getElementById('createModal').classList.add('show'); }
+function hideCreateModal() { document.getElementById('createModal').classList.remove('show'); }
+
+// Source type toggle
+function toggleSource() {
+  const q = document.getElementById('srcQuant').checked;
+  const h = document.getElementById('srcHF').checked;
+  const l = document.getElementById('srcLocal').checked;
+  document.getElementById('srcQuantField').style.display = q ? 'block' : 'none';
+  document.getElementById('srcHFField').style.display = h ? 'block' : 'none';
+  document.getElementById('srcLocalField').style.display = l ? 'block' : 'none';
+}
+
+// Engine selector
+function selectEngine(el) {
+  document.querySelectorAll('.engine-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+// Templates
+function fillTemplate(tpl) {
+  alert('已应用模板: ' + tpl);
+}
+
+// Detail modal
+function showDetailModal(name) {
+  document.getElementById('detailTitle').textContent = name;
+  document.getElementById('detailModal').classList.add('show');
+}
+function hideDetailModal() { document.getElementById('detailModal').classList.remove('show'); }
+
+// Click outside to close modals
+document.getElementById('createModal').addEventListener('click', function(e) { if (e.target === this) hideCreateModal(); });
+document.getElementById('detailModal').addEventListener('click', function(e) { if (e.target === this) hideDetailModal(); });
+</script>
+
+</body>
+</html>

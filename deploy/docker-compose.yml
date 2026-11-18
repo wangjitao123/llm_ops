@@ -24,6 +24,12 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
       POSTGRES_DB: ${POSTGRES_DB:-ai_platform}
       TZ: Asia/Shanghai
+    # 连接数上限：镜像默认 100，不够用——
+    #   API 侧池上限 = API_WORKERS × (DB_POOL_SIZE + DB_MAX_OVERFLOW) = 2 × 50 = 100
+    #   + Celery 各队列 worker（NullPool，每任务一条） + 健康检查探活
+    # 撞满时表现为 "FATAL: too many clients already"，此时 API 请求直接 500。
+    # 用命令行参数覆盖，不必改镜像内 postgresql.conf。
+    command: ["postgres", "-c", "max_connections=${POSTGRES_MAX_CONNECTIONS:-200}"]
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # 分区表等高级 DDL 由 init 脚本创建（可选，见 sql/01-create-tables.sql）
@@ -84,11 +90,29 @@ services:
       SECRET_KEY: ${SECRET_KEY:-please_change_me_to_random}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
-      AUTO_CREATE_TABLES: "true"
-      HIGRESS_ADMIN_API: http://higress-gateway:8080/api
+      AUTO_CREATE_TABLES: "${AUTO_CREATE_TABLES:-true}"
+      HIGRESS_ADMIN_API: ${HIGRESS_ADMIN_API:-http://higress-gateway:8080/api}
+      # 开发模式直连登录开关。当前前端登录页**只走这个接口**（未接 SSO），
+      # 因此生产环境在接入真实账号体系之前必须保持 true，否则没人能登录；
+      # 接好 SSO/账号体系后立刻改为 false（详见 deploy/生产环境参数清单.md）。
+      ENABLE_DEV_LOGIN: "${ENABLE_DEV_LOGIN:-true}"
+      # 压测模型白名单（provider 前缀，逗号分隔）。留空 = 不限制。
+      PERF_TESTABLE_PROVIDER_PREFIX: ${PERF_TESTABLE_PROVIDER_PREFIX:-}
+      # ---- 网关高并发调优（必须在 compose 里透传，否则 deploy/.env 里设了也进不去容器）----
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-30}
+      DB_POOL_RECYCLE: ${DB_POOL_RECYCLE:-1800}
+      HTTP_POOL_MAX_CONNECTIONS: ${HTTP_POOL_MAX_CONNECTIONS:-200}
+      HTTP_POOL_MAX_KEEPALIVE: ${HTTP_POOL_MAX_KEEPALIVE:-50}
+      HTTP_CONNECT_TIMEOUT: ${HTTP_CONNECT_TIMEOUT:-10}
+      HTTP_READ_TIMEOUT: ${HTTP_READ_TIMEOUT:-300}
+      KEY_LAST_USED_THROTTLE_SECONDS: ${KEY_LAST_USED_THROTTLE_SECONDS:-60}
       TZ: Asia/Shanghai
     ports:
       - "8000:8000"   # 按需开放（调试用），生产走 nginx/higress
+    volumes:
+      # 与 perf-worker 共享：报告下载接口在 api-server 侧读文件
+      - perf_outputs:/app/perf_outputs
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -127,6 +151,96 @@ services:
       rabbitmq: { condition: service_healthy }
     networks: [backend]
 
+  # ---------- 模型部署执行 Worker（需要 Docker 权限）----------
+  # 职责：拉起/停止/删除推理容器。与 api-server 分离，避免 API 进程持有 Docker 权限。
+  # 队列 deploy 独立，避免长耗时部署任务阻塞常规 Celery 任务。
+  deploy-worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: llm-ops-deploy
+    restart: unless-stopped
+    command: celery -A app.tasks.worker:celery_app worker -Q deploy --concurrency=${DEPLOY_CONCURRENCY:-2} -l info
+    environment:
+      <<: *api_env
+      # 部署出来的推理容器要加入本 compose 的 backend 网络，网关才能按容器名直连
+      DEPLOY_NETWORK: llm-ops_backend
+      DEPLOY_MODELS_VOLUME: llm-ops_quantized_models
+      DEPLOY_VLLM_IMAGE: ${DEPLOY_VLLM_IMAGE:-vllm/vllm-openai:v0.6.4.post1}
+      DEPLOY_PORT_RANGE_START: ${DEPLOY_PORT_RANGE_START:-31100}
+      DEPLOY_PORT_RANGE_END: ${DEPLOY_PORT_RANGE_END:-31299}
+      DEPLOY_READY_TIMEOUT: ${DEPLOY_READY_TIMEOUT:-600}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - quantized_models:/models
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [backend]
+
+  # ---------- GPU 量化 Worker ----------
+  quantization-worker:
+    build:
+      context: ../backend
+      dockerfile: ../deploy/quantization/Dockerfile
+    container_name: llm-ops-quant
+    restart: unless-stopped
+    command: celery -A app.tasks.worker:celery_app worker -Q quantization --concurrency=1 -l info
+    environment:
+      <<: *api_env
+      QUANTIZED_MODELS_DIR: /models
+    volumes:
+      - quantized_models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [backend]
+
+  # ---------- 模型压测 Worker（独立镜像：装 EvalScope，无需 GPU）----------
+  perf-worker:
+    build:
+      context: ../backend
+      dockerfile: ../deploy/perf/Dockerfile
+      args:
+        EVALSCOPE_VER: ${EVALSCOPE_VER:-}
+        # 国内部署务必指定镜像源，否则 evalscope 依赖（200MB+）会极慢或超时
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+    container_name: llm-ops-perf
+    restart: unless-stopped
+    command: celery -A app.tasks.worker:celery_app worker -Q perf --concurrency=${PERF_WORKER_CONCURRENCY:-2} -l info
+    environment:
+      <<: *api_env
+      PERF_OUTPUTS_DIR: /app/perf_outputs
+      PERF_MAX_PARALLEL: ${PERF_MAX_PARALLEL:-500}
+      PERF_MAX_NUMBER: ${PERF_MAX_NUMBER:-50000}
+      PERF_TASK_TIMEOUT: ${PERF_TASK_TIMEOUT:-1800}
+      PERF_PROGRESS_INTERVAL: ${PERF_PROGRESS_INTERVAL:-5}
+      # 经网关压测时打向 api-server（同网络，用容器名）
+      PERF_GATEWAY_BASE_URL: ${PERF_GATEWAY_BASE_URL:-http://llm-ops-api:8000/v1}
+      # 经网关压测必须配一个平台 AppKey，否则网关 401
+      PERF_GATEWAY_API_KEY: ${PERF_GATEWAY_API_KEY:-}
+      # tokenizer 下载源。EvalScope 会给 transformers 打补丁走 ModelScope，
+      # 因此 tokenizer_path 需填 ModelScope 上存在的仓库名（如 Qwen/Qwen2.5-7B-Instruct）。
+      HF_ENDPOINT: ${HF_ENDPOINT:-https://hf-mirror.com}
+      HF_HOME: /app/perf_outputs/.cache/hf
+      # ModelScope 缓存也放进持久卷，否则容器重建后 tokenizer 需要重新下载
+      MODELSCOPE_CACHE: /app/perf_outputs/.cache/modelscope
+      # 置 1 可改为走 HuggingFace（需 HF_ENDPOINT 可达）
+      USE_MODELSCOPE_HUB: ${USE_MODELSCOPE_HUB:-1}
+    volumes:
+      - perf_outputs:/app/perf_outputs
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    networks: [backend]
+
   # ---------- 前端 ----------
   web:
     build:
@@ -150,3 +264,5 @@ volumes:
   postgres_data:
   redis_data:
   rabbitmq_data:
+  quantized_models:
+  perf_outputs:

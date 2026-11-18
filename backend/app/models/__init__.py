@@ -6,8 +6,12 @@ from app.core.database import Base
 from app.models.model import Model, ModelVersion, ModelHeartbeat
 from app.models.key import Application, AppKey, AppKeyModel
 from app.models.token import ApiRequestLog, TokenStatsHourly, TokenStatsDaily
+from app.models.pricing import ModelPricing
 from app.models.gateway import RouteRule, RouteRuleModel, RateLimitConfig
 from app.models.finetune import Dataset, DatasetVersion, FinetuneTask, FinetuneEval
+from app.models.quantization import QuantizationTask
+from app.models.deployment import Deployment
+from app.models.perf import PerfTask, PerfTaskLog
 from app.models.system import (
     SystemConfig,
     AlertRule,
@@ -29,6 +33,7 @@ __all__ = [
     "ApiRequestLog",
     "TokenStatsHourly",
     "TokenStatsDaily",
+    "ModelPricing",
     "RouteRule",
     "RouteRuleModel",
     "RateLimitConfig",
@@ -36,6 +41,10 @@ __all__ = [
     "DatasetVersion",
     "FinetuneTask",
     "FinetuneEval",
+    "QuantizationTask",
+    "Deployment",
+    "PerfTask",
+    "PerfTaskLog",
     "SystemConfig",
     "AlertRule",
     "AlertLog",

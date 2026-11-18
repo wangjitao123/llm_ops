@@ -32,6 +32,7 @@
                 {{ (record.provider || '?')[0].toUpperCase() }}
               </a-avatar>
               <span style="font-weight: 500">{{ record.name }}</span>
+              <a-tag v-if="unpricedIds.includes(record.id)" color="orange">未计费</a-tag>
             </a-space>
           </template>
         </a-table-column>
@@ -48,7 +49,7 @@
           </template>
         </a-table-column>
         <a-table-column title="API 地址" data-index="api_base_url" key="api_base_url" ellipsis />
-        <a-table-column title="操作" key="action" width="260">
+        <a-table-column title="操作" key="action" width="320">
           <template #default="{ record }">
             <a-space>
               <a-button type="link" size="small" @click="openEditModal(record)">编辑</a-button>
@@ -56,6 +57,7 @@
                 {{ record.status === 'online' ? '停用' : '启用' }}
               </a-button>
               <a-button type="link" size="small" @click="showVersions(record)">版本</a-button>
+              <a-button type="link" size="small" @click="openPricingModal(record)">计费</a-button>
               <a-popconfirm title="确定删除该模型？" ok-text="删除" cancel-text="取消" @confirm="handleDelete(record)">
                 <a-button type="link" danger size="small">删除</a-button>
               </a-popconfirm>
@@ -117,6 +119,50 @@
         <a-table-column title="创建时间" data-index="created_at" key="created_at" width="180" />
       </a-table>
     </a-modal>
+
+    <a-modal
+      v-model:open="pricingModalOpen"
+      :title="`计费单价 - ${pricingModelName}`"
+      :confirm-loading="pricingSaving"
+      @ok="handleSavePricing"
+      width="520px"
+    >
+      <a-alert
+        type="info"
+        show-icon
+        style="margin-bottom: 12px"
+        message="单价按「元 / 千 token」填写；未配置的模型按 0 元计费。改价只影响之后聚合出的账单，不追溯改写历史。"
+      />
+      <a-form layout="vertical">
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="输入单价（元/千 token）">
+              <a-input-number
+                v-model:value="pricingForm.input_price_per_1k"
+                :min="0"
+                :precision="6"
+                :step="0.001"
+                style="width: 100%"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="输出单价（元/千 token）">
+              <a-input-number
+                v-model:value="pricingForm.output_price_per_1k"
+                :min="0"
+                :precision="6"
+                :step="0.001"
+                style="width: 100%"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="备注">
+          <a-input v-model:value="pricingForm.remark" placeholder="如：官方价 / 内部结算价" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -125,6 +171,7 @@ import { ref, onMounted, reactive } from 'vue'
 import { message } from 'ant-design-vue'
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { getModelList, createModel, updateModel, deleteModel, updateModelStatus, getModelVersions } from '@/api/modelApi'
+import { getPricingList, savePricing } from '@/api/pricingApi'
 import type { ModelItem } from '@/types/api'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { formatTime } from '@/utils'
@@ -136,6 +183,15 @@ const saving = ref(false)
 const editing = ref(false)
 const versions = ref<any[]>([])
 const versionModalOpen = ref(false)
+
+// 计费单价
+const pricingModalOpen = ref(false)
+const pricingSaving = ref(false)
+const pricingModelId = ref<number>()
+const pricingModelName = ref('')
+const pricingForm = reactive({ input_price_per_1k: 0, output_price_per_1k: 0, remark: '' })
+const pricingItems = ref<any[]>([])
+const unpricedIds = ref<number[]>([])
 
 const providers = ['deepseek', 'openai', 'aliyun', 'baidu', 'anthropic', 'google']
 
@@ -223,7 +279,41 @@ async function showVersions(record: ModelItem) {
   versionModalOpen.value = true
 }
 
-onMounted(loadModels)
+async function loadPricing() {
+  const data = (await getPricingList()) as any
+  pricingItems.value = data?.items || []
+  unpricedIds.value = data?.unpriced_model_ids || []
+}
+
+function openPricingModal(record: ModelItem) {
+  pricingModelId.value = record.id
+  pricingModelName.value = record.name
+  const existing = pricingItems.value.find((p) => p.model_id === record.id)
+  Object.assign(pricingForm, {
+    input_price_per_1k: existing?.input_price_per_1k ?? 0,
+    output_price_per_1k: existing?.output_price_per_1k ?? 0,
+    remark: existing?.remark || ''
+  })
+  pricingModalOpen.value = true
+}
+
+async function handleSavePricing() {
+  if (!pricingModelId.value) return
+  pricingSaving.value = true
+  try {
+    await savePricing(pricingModelId.value, { ...pricingForm })
+    message.success('计费单价已保存')
+    pricingModalOpen.value = false
+    loadPricing()
+  } finally {
+    pricingSaving.value = false
+  }
+}
+
+onMounted(() => {
+  loadModels()
+  loadPricing()
+})
 </script>
 
 <style scoped>

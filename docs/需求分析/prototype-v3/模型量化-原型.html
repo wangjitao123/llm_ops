@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模型量化 - 原型 v3</title>
+<style>
+/* ========== Reset & Base ========== */
+*, *::before, *::after { margin:0;padding:0;box-sizing:border-box; }
+body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; background:#f0f2f5; color:rgba(0,0,0,.85); font-size:14px; }
+
+/* ========== Layout ========== */
+.layout { display:flex; min-height:100vh; }
+
+/* Sidebar */
+.sidebar { width:240px; background:#001529; display:flex; flex-direction:column; position:sticky; top:0; height:100vh; }
+.logo { height:64px; display:flex; align-items:center; padding:0 24px; border-bottom:1px solid rgba(255,255,255,.08); gap:10px; }
+.logo-icon { width:36px; height:36px; background:linear-gradient(135deg,#1890ff,#096dd9); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:18px; color:#fff; flex-shrink:0; }
+.logo-text { color:#fff; font-size:16px; font-weight:600; letter-spacing:.5px; }
+.nav { flex:1; padding:12px 0; overflow-y:auto; }
+.nav-item { display:flex; align-items:center; gap:12px; padding:12px 24px; cursor:pointer; color:rgba(255,255,255,.65); font-size:14px; transition:all .2s; border-left:3px solid transparent; }
+.nav-item:hover { color:#fff; background:rgba(255,255,255,.04); }
+.nav-item.active { color:#fff; background:rgba(24,144,255,.15); border-left-color:#1890ff; }
+.nav-icon { width:18px; text-align:center; font-size:16px; }
+.nav-badge { margin-left:auto; font-size:11px; background:#1890ff; color:#fff; padding:0 8px; border-radius:10px; line-height:20px; }
+.nav-divider { height:1px; background:rgba(255,255,255,.06); margin:8px 16px; }
+
+/* Header */
+.main { flex:1; min-width:0; }
+.header { height:64px; background:#fff; padding:0 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 1px 4px rgba(0,0,0,.06); position:sticky; top:0; z-index:10; }
+.breadcrumb { font-size:14px; color:#8c8c8c; }
+.breadcrumb .sep { margin:0 8px; color:#d9d9d9; }
+.breadcrumb .curr { color:rgba(0,0,0,.85); font-weight:500; }
+.header-right { display:flex; align-items:center; gap:20px; }
+.header-icon { font-size:18px; color:#8c8c8c; cursor:pointer; }
+.header-icon:hover { color:rgba(0,0,0,.85); }
+.user-avatar { width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,#1890ff,#36cfc9); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:600; cursor:pointer; }
+
+/* Content */
+.content { padding:24px; }
+
+/* Page header */
+.page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+.page-title { font-size:20px; font-weight:600; color:rgba(0,0,0,.85); }
+.page-sub { font-size:14px; color:#8c8c8c; margin-top:4px; }
+
+/* Card */
+.card { background:#fff; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); overflow:hidden; }
+.card-header { padding:16px 20px; border-bottom:1px solid #f0f0f0; display:flex; align-items:center; justify-content:space-between; }
+.card-title { font-size:15px; font-weight:600; }
+.card-body { padding:20px; }
+
+/* Toolbar */
+.toolbar { margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+.toolbar-filters { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+
+/* ========== Components ========== */
+.input, .select {
+  height:36px; padding:4px 12px; border:1px solid #d9d9d9; border-radius:8px; font-size:14px; outline:none; background:#fff; transition:all .2s; min-width:120px;
+}
+.input:focus, .select:focus { border-color:#1890ff; box-shadow:0 0 0 2px rgba(24,144,255,.08); }
+
+.btn {
+  display:inline-flex; align-items:center; gap:6px; height:36px; padding:4px 16px; border-radius:8px; font-size:14px; cursor:pointer; transition:all .2s; border:1px solid #d9d9d9; background:#fff; color:rgba(0,0,0,.85); white-space:nowrap;
+}
+.btn:hover { color:#1890ff; border-color:#1890ff; }
+.btn-primary { background:#1890ff; border-color:#1890ff; color:#fff; }
+.btn-primary:hover { background:#40a9ff; border-color:#40a9ff; color:#fff; }
+.btn-sm { height:28px; padding:0 12px; font-size:13px; border-radius:6px; }
+
+/* Table */
+table { width:100%; border-collapse:collapse; }
+th { padding:14px 16px; text-align:left; font-size:13px; font-weight:500; color:#8c8c8c; background:#fafafa; border-bottom:1px solid #f0f0f0; }
+td { padding:14px 16px; text-align:left; font-size:14px; border-bottom:1px solid #f0f0f0; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:#fafafa; }
+td:last-child { white-space:nowrap; }
+
+/* Tags */
+.tag { display:inline-flex; align-items:center; gap:4px; padding:0 8px; border-radius:4px; font-size:12px; line-height:24px; font-weight:500; }
+.tag-blue { color:#1890ff; background:#e6f7ff; border:1px solid #91d5ff; }
+.tag-green { color:#52c41a; background:#f6ffed; border:1px solid #b7eb8f; }
+.tag-orange { color:#fa8c16; background:#fff7e6; border:1px solid #ffd591; }
+.tag-red { color:#ff4d4f; background:#fff1f0; border:1px solid #ffa39e; }
+.tag-grey { color:#8c8c8c; background:#fafafa; border:1px solid #d9d9d9; }
+.tag-purple { color:#722ed1; background:#f9f0ff; border:1px solid #d3adf7; }
+
+/* Status badge */
+.status-badge { display:inline-flex; align-items:center; gap:6px; }
+.dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+.dot-pending { background:#d9d9d9; }
+.dot-queued { background:#1890ff; }
+.dot-running { background:#fa8c16; animation:pulse 1.5s infinite; }
+.dot-completed { background:#52c41a; }
+.dot-failed { background:#ff4d4f; }
+.dot-cancelled { background:#8c8c8c; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* Progress */
+.progress-wrap { display:flex; align-items:center; gap:8px; max-width:160px; }
+.progress-bar { flex:1; height:8px; background:#f0f0f0; border-radius:10px; overflow:hidden; }
+.progress-fill { height:100%; border-radius:10px; transition:width .5s ease; }
+.progress-fill-green { background:linear-gradient(90deg,#52c41a,#73d13d); }
+.progress-fill-orange { background:linear-gradient(90deg,#fa8c16,#ffa940); }
+.progress-fill-red { background:linear-gradient(90deg,#ff4d4f,#ff7875); }
+.progress-fill-grey { background:#d9d9d9; }
+.progress-text { font-size:12px; color:#8c8c8c; min-width:32px; font-variant-numeric:tabular-nums; }
+
+/* Action links */
+.link { color:#1890ff; text-decoration:none; font-size:14px; cursor:pointer; }
+.link:hover { color:#40a9ff; }
+.link-danger { color:#ff4d4f; }
+.link-danger:hover { color:#ff7875; }
+
+/* Empty state */
+.empty { text-align:center; padding:60px 0; color:#8c8c8c; }
+.empty-icon { font-size:48px; margin-bottom:12px; opacity:.4; }
+.empty-text { font-size:14px; }
+
+/* ========== Modal ========== */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:1000; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
+.modal-overlay.show { display:flex; }
+.modal { background:#fff; border-radius:12px; width:740px; max-height:85vh; overflow:hidden; box-shadow:0 12px 48px rgba(0,0,0,.12); display:flex; flex-direction:column; }
+.modal-header { display:flex; align-items:center; justify-content:space-between; padding:20px 24px 16px; border-bottom:1px solid #f0f0f0; flex-shrink:0; }
+.modal-header h3 { font-size:17px; font-weight:600; }
+.modal-close { width:32px; height:32px; border:none; background:none; font-size:18px; cursor:pointer; color:#8c8c8c; border-radius:8px; display:flex; align-items:center; justify-content:center; transition:all .2s; }
+.modal-close:hover { background:#f5f5f5; color:rgba(0,0,0,.85); }
+.modal-body { padding:24px; overflow-y:auto; flex:1; }
+.modal-footer { padding:16px 24px; border-top:1px solid #f0f0f0; display:flex; justify-content:flex-end; gap:8px; flex-shrink:0; }
+.modal-footer .btn { padding:6px 20px; height:40px; font-size:15px; border-radius:8px; }
+
+/* ========== Form ========== */
+.form-section { margin-bottom:20px; }
+.form-section-label { font-size:15px; font-weight:600; color:rgba(0,0,0,.85); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+.form-section-label::after { content:''; flex:1; height:1px; background:#f0f0f0; }
+.form-row { display:flex; gap:16px; margin-bottom:0; }
+.form-row .form-item { flex:1; min-width:0; }
+.form-item { margin-bottom:16px; }
+.form-item:last-child { margin-bottom:0; }
+.form-label { display:flex; align-items:center; gap:4px; font-size:14px; font-weight:500; margin-bottom:6px; color:rgba(0,0,0,.85); }
+.form-label .required { color:#ff4d4f; }
+.form-label .hint { font-size:12px; color:#8c8c8c; font-weight:400; margin-left:4px; }
+.form-control { width:100%; height:38px; padding:4px 12px; border:1px solid #d9d9d9; border-radius:8px; font-size:14px; outline:none; background:#fff; transition:all .2s; color:rgba(0,0,0,.85); }
+.form-control:focus { border-color:#1890ff; box-shadow:0 0 0 2px rgba(24,144,255,.08); }
+textarea.form-control { height:auto; min-height:72px; resize:vertical; font-family:inherit; }
+select.form-control { cursor:pointer; appearance:auto; }
+
+/* Template presets */
+.templates { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; padding:16px; background:#fafafa; border-radius:10px; border:1px solid #f0f0f0; }
+.templates-label { font-size:13px; color:#8c8c8c; display:flex; align-items:center; gap:6px; padding-right:8px; }
+.template-chip { display:inline-flex; align-items:center; gap:4px; padding:4px 14px; border-radius:20px; font-size:13px; cursor:pointer; transition:all .2s; border:1px solid #e8e8e8; background:#fff; color:rgba(0,0,0,.85); }
+.template-chip:hover { border-color:#1890ff; color:#1890ff; background:#e6f7ff; box-shadow:0 2px 8px rgba(24,144,255,.12); }
+.template-chip .chip-badge { font-size:10px; background:#1890ff; color:#fff; border-radius:10px; padding:0 6px; line-height:18px; }
+
+/* File upload */
+.file-upload { display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px dashed #d9d9d9; border-radius:8px; cursor:pointer; transition:all .2s; color:#8c8c8c; font-size:13px; background:#fafafa; }
+.file-upload:hover { border-color:#1890ff; color:#1890ff; background:#e6f7ff; }
+.file-upload input[type=file] { display:none; }
+
+/* Description table in detail modal */
+.desc-table { width:100%; border-collapse:collapse; }
+.desc-table td { padding:9px 12px; border:1px solid #f0f0f0; font-size:14px; }
+.desc-table td:first-child { background:#fafafa; font-weight:500; color:#8c8c8c; width:110px; }
+.desc-table tr:last-child td { border-bottom:1px solid #f0f0f0; }
+
+/* Log panel */
+.log-section { margin-top:20px; border-top:1px solid #f0f0f0; padding-top:16px; }
+.log-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.log-title { font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px; }
+.log-status { font-size:12px; color:#8c8c8c; }
+.log-panel { background:#1a1a2e; border-radius:8px; padding:14px; font-family:'JetBrains Mono','Consolas','Monaco',monospace; font-size:13px; line-height:1.6; max-height:220px; overflow-y:auto; }
+.log-line { display:flex; gap:8px; padding:1px 0; }
+.log-time { color:#6a9955; flex-shrink:0; }
+.log-level { flex-shrink:0; width:44px; }
+.log-level-info { color:#569cd6; }
+.log-level-warn { color:#dcdcaa; }
+.log-level-err { color:#f44747; }
+.log-level-ok { color:#52c41a; }
+.log-msg { color:#d4d4d4; }
+.log-dim { color:#6a6a8a; font-style:italic; }
+
+/* Info banner */
+.banner { display:flex; align-items:center; gap:10px; padding:10px 16px; background:linear-gradient(135deg,#e6f7ff,#f0f9ff); border:1px solid #91d5ff; border-radius:10px; margin-bottom:20px; font-size:14px; color:#0050b3; }
+.banner-icon { font-size:18px; }
+
+/* Animations */
+@keyframes fadeSlide { from{opacity:0;transform:translateY(-8px)scale(.98)} to{opacity:1;transform:translateY(0)scale(1)} }
+.modal { animation:fadeSlide .2s ease; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo"><div class="logo-icon">🧠</div><span class="logo-text">LLM Ops</span></div>
+    <nav class="nav">
+      <div class="nav-item"><span class="nav-icon">📊</span> 总览大屏</div>
+      <div class="nav-item"><span class="nav-icon">🤖</span> 模型管理</div>
+      <div class="nav-item"><span class="nav-icon">🔑</span> Key 管理</div>
+      <div class="nav-item"><span class="nav-icon">📈</span> Token 统计</div>
+      <div class="nav-item"><span class="nav-icon">🚪</span> 统一网关</div>
+      <div class="nav-item"><span class="nav-icon">🔬</span> 模型微调</div>
+      <div class="nav-item"><span class="nav-icon">📊</span> 模型对比</div>
+      <div class="nav-item active"><span class="nav-icon">💡</span> 模型量化 <span class="nav-badge">NEW</span></div>
+      <div class="nav-divider"></div>
+      <div class="nav-item"><span class="nav-icon">⚙️</span> 系统管理</div>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Header -->
+    <header class="header">
+      <div class="breadcrumb"><span class="curr">模型量化</span> <span class="sep">/</span> 量化任务管理</div>
+      <div class="header-right">
+        <span class="header-icon">🔔</span>
+        <div class="user-avatar">A</div>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+      <!-- Page header -->
+      <div class="page-header">
+        <div>
+          <div class="page-title">量化任务</div>
+          <div class="page-sub">创建和管理 GPU 模型量化任务，完成后自动注册到模型管理</div>
+        </div>
+      </div>
+
+      <!-- Banner -->
+      <div class="banner">
+        <span class="banner-icon">💡</span>
+        <span>平台集成了 <b>GPTQ</b>、<b>AWQ</b>、<b>bitsandbytes</b> 三种量化算法，利用 GPU（8×NVIDIA L20）自动执行。量化完成后的模型可直接在「模型管理」中使用。</span>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="toolbar-filters">
+          <select class="select" id="statusFilter" onchange="renderTasks()">
+            <option value="">全部状态</option>
+            <option value="pending">待提交</option>
+            <option value="queued">排队中</option>
+            <option value="running">运行中</option>
+            <option value="completed">已完成</option>
+            <option value="failed">失败</option>
+          </select>
+          <button class="btn btn-primary" onclick="renderTasks()">🔍 查询</button>
+        </div>
+        <button class="btn btn-primary" onclick="openCreate()">＋ 创建量化任务</button>
+      </div>
+
+      <!-- Table -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">任务列表</span></div>
+        <div class="card-body" style="padding:0;">
+          <table>
+            <thead><tr>
+              <th style="width:34%">任务名称</th><th style="width:15%">量化方案</th><th style="width:10%">状态</th><th style="width:16%">进度</th><th style="width:10%">结果</th><th style="width:15%">操作</th>
+            </tr></thead>
+            <tbody id="taskTable"></tbody>
+          </table>
+          <div class="empty" id="emptyHint"><div class="empty-icon">📭</div><div class="empty-text">暂无量化任务</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== Create Modal ========== -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <div class="modal-header"><h3>＋ 创建量化任务</h3><button class="modal-close" onclick="closeCreate()">✕</button></div>
+    <div class="modal-body">
+      <!-- Quick templates -->
+      <div class="templates">
+        <span class="templates-label">⚡ 快速模板</span>
+        <span class="template-chip" onclick="applyTemplate('gptq',4,128)">W4A16-GPTQ <span class="chip-badge">推荐</span></span>
+        <span class="template-chip" onclick="applyTemplate('awq',4,128)">W4A16-AWQ</span>
+        <span class="template-chip" onclick="applyTemplate('bitsandbytes',4,64)">W4A16-bnb</span>
+        <span class="template-chip" onclick="applyTemplate('gptq',8,128)">W8A16-GPTQ <span class="chip-badge">无损</span></span>
+        <span class="template-chip" onclick="applyTemplate('awq',3,128)">W3A16-AWQ 极限压缩</span>
+      </div>
+
+      <!-- Section: Basic -->
+      <div class="form-section"><div class="form-section-label">基本信息</div></div>
+      <div class="form-item">
+        <label class="form-label">任务名称 <span class="required">*</span></label>
+        <input class="form-control" placeholder="例如：Qwen2.5-7B GPTQ 4bit 量化" id="taskName">
+      </div>
+      <div class="form-row">
+        <div class="form-item">
+          <label class="form-label">HuggingFace 模型 ID <span class="required">*</span></label>
+          <input class="form-control" placeholder="例如：Qwen/Qwen2.5-7B-Instruct" id="hfModelId" value="Qwen/Qwen2.5-7B-Instruct">
+        </div>
+        <div class="form-item">
+          <label class="form-label">输出模型名称 <span class="hint">选填，默认自动生成</span></label>
+          <input class="form-control" placeholder="留空自动命名" id="outputName">
+        </div>
+      </div>
+
+      <!-- Section: Algorithm -->
+      <div class="form-section"><div class="form-section-label">量化配置</div></div>
+      <div class="form-row">
+        <div class="form-item">
+          <label class="form-label">量化算法 <span class="required">*</span></label>
+          <select class="form-control" id="algorithm">
+            <option value="gptq">GPTQ — 通用最优，社区广泛使用</option>
+            <option value="awq">AWQ — 激活感知，精度保持最好</option>
+            <option value="bitsandbytes">bitsandbytes — 轻量快速，无需校准</option>
+          </select>
+        </div>
+        <div class="form-item">
+          <label class="form-label">权重精度 <span class="required">*</span></label>
+          <select class="form-control" id="weightBits">
+            <option value="2">2 bit — 极致压缩（需 QAT 配合）</option>
+            <option value="3">3 bit — 折中选择</option>
+            <option value="4" selected>4 bit — 推荐，4 倍压缩</option>
+            <option value="8">8 bit — 近乎无损</option>
+          </select>
+        </div>
+        <div class="form-item">
+          <label class="form-label">分组大小 <span class="required">*</span></label>
+          <select class="form-control" id="groupSize">
+            <option value="32">32 — 高精度，模型较大</option>
+            <option value="64">64 — 适中</option>
+            <option value="128" selected>128 — 推荐，平衡精度/体积</option>
+            <option value="256">256 — 低精度，模型最小</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Section: Calibration -->
+      <div class="form-section"><div class="form-section-label">校准数据</div></div>
+      <div class="form-row">
+        <div class="form-item" style="flex:0 0 120px;">
+          <label class="form-label">样本数</label>
+          <input class="form-control" type="number" value="256" id="calibSamples" min="64" max="1024" step="64">
+        </div>
+        <div class="form-item">
+          <label class="form-label">校准数据来源 <span class="hint">留空使用默认 wikitext-2 数据集</span></label>
+          <div style="display:flex;gap:8px;">
+            <select class="form-control" id="calibSource" onchange="toggleCalibInput()" style="flex:1;">
+              <option value="default">默认数据集（wikitext-2）</option>
+              <option value="custom">自定义校准文本</option>
+            </select>
+            <label class="file-upload" id="fileUploadBtn" style="display:none;">
+              📁 上传 .txt 文件
+              <input type="file" accept=".txt,.jsonl" onchange="handleFile(event)">
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="form-item" id="calibTextArea" style="display:none;">
+        <textarea class="form-control" rows="4" placeholder="在此粘贴校准文本，每行一条样本。示例：&#10;What is the capital of France?&#10;Explain quantum computing.&#10;Write a Python function to sort a list." id="calibText"></textarea>
+      </div>
+
+      <!-- Advanced toggle -->
+      <details style="margin-top:12px;cursor:pointer;">
+        <summary style="font-size:13px;color:#8c8c8c;">高级设置</summary>
+        <div style="margin-top:12px;">
+          <div class="form-row">
+            <div class="form-item">
+              <label class="form-label">输出路径 <span class="hint">默认 /models/</span></label>
+              <input class="form-control" placeholder="留空使用默认路径" id="outputPath">
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeCreate()">取消</button>
+      <button class="btn btn-primary" onclick="createTask()">创建并提交</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== Detail Modal ========== -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal" style="width:700px;">
+    <div class="modal-header"><h3>📋 任务详情</h3><button class="modal-close" onclick="closeDetail()">✕</button></div>
+    <div class="modal-body">
+      <table class="desc-table">
+        <tr><td>任务名称</td><td id="dName" style="font-weight:600;">-</td></tr>
+        <tr><td>基座模型</td><td id="dModel"><code style="background:#f5f5f5;padding:1px 6px;border-radius:4px;">-</code></td></tr>
+        <tr><td>量化方案</td><td id="dAlgo">-</td></tr>
+        <tr><td>精度</td><td id="dPrecision">-</td></tr>
+        <tr><td>分组大小</td><td id="dGroup">-</td></tr>
+        <tr><td>校准数据</td><td id="dCalib">-</td></tr>
+        <tr><td>输出路径</td><td id="dOutput"><code style="background:#f5f5f5;padding:1px 6px;border-radius:4px;">-</code></td></tr>
+        <tr><td>结果模型</td><td id="dResult">-</td></tr>
+        <tr><td>错误信息</td><td id="dError" style="color:#ff4d4f;"></td></tr>
+        <tr><td>创建人</td><td id="dCreator">-</td></tr>
+        <tr><td>创建时间</td><td id="dCreated">-</td></tr>
+      </table>
+
+      <div class="log-section">
+        <div class="log-header">
+          <span class="log-title">📋 运行日志</span>
+          <span class="log-status" id="logStatus">-</span>
+        </div>
+        <div class="log-panel" id="logPanel">
+          <div class="log-line"><span class="log-time">[--:--:--]</span><span class="log-level log-level-info">INFO</span><span class="log-msg log-dim">等待任务启动...</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeDetail()">关闭</button></div>
+  </div>
+</div>
+
+<script>
+const statusMap = { pending:'待提交', queued:'排队中', running:'运行中', completed:'已完成', failed:'失败', cancelled:'已取消' };
+const colorMap = { pending:'grey', queued:'blue', running:'orange', completed:'green', failed:'red', cancelled:'grey' };
+
+let tasks = [];
+let taskIdCounter = 0;
+
+// Init mock data
+(function() {
+  tasks = [
+    { id:++taskIdCounter, name:'Qwen2.5-7B GPTQ 4bit', hf_id:'Qwen/Qwen2.5-7B-Instruct', output_name:'', algo:'gptq', wBits:4, aBits:16, gSize:128, calibSamples:256, calibSource:'default', output_path:'/models/Qwen--Qwen2.5-7B-Instruct-gptq-w4a16', status:'completed', progress:100, err:null, resultModelId:5, created_by:'admin', created_at:'2026-09-13 10:00' },
+    { id:++taskIdCounter, name:'Llama3-8B AWQ 4bit', hf_id:'meta-llama/Meta-Llama-3-8B', output_name:'', algo:'awq', wBits:4, aBits:16, gSize:128, calibSamples:256, calibSource:'default', output_path:null, status:'running', progress:45, err:null, resultModelId:null, created_by:'admin', created_at:'2026-09-13 10:30' },
+    { id:++taskIdCounter, name:'CodeLlama-7B bnb 4bit', hf_id:'codellama/CodeLlama-7b-hf', output_name:'', algo:'bitsandbytes', wBits:4, aBits:16, gSize:64, calibSamples:128, calibSource:'default', output_path:null, status:'pending', progress:0, err:null, resultModelId:null, created_by:'admin', created_at:'2026-09-13 11:00' },
+    { id:++taskIdCounter, name:'Mistral-7B AWQ 3bit', hf_id:'mistralai/Mistral-7B-v0.3', output_name:'', algo:'awq', wBits:3, aBits:16, gSize:128, calibSamples:256, calibSource:'default', output_path:null, status:'failed', progress:15, err:'CUDA out of memory. 3bit AWQ 需要约 20GB 显存。', resultModelId:null, created_by:'admin', created_at:'2026-09-13 09:00' },
+    { id:++taskIdCounter, name:'DeepSeek-Coder AWQ 4bit', hf_id:'deepseek-ai/deepseek-coder-6.7b-instruct', output_name:'deepseek-coder-awq', algo:'awq', wBits:4, aBits:16, gSize:128, calibSamples:256, calibSource:'custom', output_path:'/models/deepseek-coder-awq', status:'completed', progress:100, err:null, resultModelId:6, created_by:'admin', created_at:'2026-09-12 14:00' },
+  ];
+})();
+
+const logs = {
+  running: [
+    {time:'10:30:01', lv:'info', msg:'开始量化任务 #2 (Llama3-8B AWQ 4bit)'},
+    {time:'10:30:03', lv:'info', msg:'从 HuggingFace 下载模型 meta-llama/Meta-Llama-3-8B ...'},
+    {time:'10:32:15', lv:'info', msg:'模型下载完成 (4.7GB)'},
+    {time:'10:32:16', lv:'info', msg:'加载校准数据 (256 条 wikitext-2)'},
+    {time:'10:32:20', lv:'info', msg:'开始 AWQ 量化 (W4A16, group_size=128)'},
+    {time:'10:35:40', lv:'info', msg:'量化进度: 45% — 处理第 45/100 个 transformer block'},
+    {time:'10:35:41', lv:'info', msg:'当前显存: 12.4 GB / 48 GB (L20)'},
+    {time:'--:--:--', lv:'dim', msg:'任务运行中，日志持续更新...'},
+  ],
+  completed: [
+    {time:'10:30:01', lv:'info', msg:'开始量化任务'},
+    {time:'10:32:15', lv:'info', msg:'模型下载完成'},
+    {time:'10:50:20', lv:'info', msg:'量化完成！模型保存至 /models/xxx'},
+    {time:'10:50:22', lv:'info', msg:'注册量化模型到平台 (模型ID #xxx)'},
+    {time:'10:50:25', lv:'ok', msg:'任务完成，总耗时 20 分钟 24 秒'},
+  ],
+  failed: [
+    {time:'09:00:01', lv:'info', msg:'开始量化任务'},
+    {time:'09:02:10', lv:'info', msg:'模型下载完成'},
+    {time:'09:05:30', lv:'info', msg:'开始 AWQ 量化'},
+    {time:'09:12:18', lv:'warn', msg:'显存占用: 21.6 GB / 48 GB'},
+    {time:'09:12:20', lv:'err', msg:'CUDA out of memory'},
+  ],
+  pending: [{time:'--:--:--', lv:'dim', msg:'等待提交执行...'}],
+};
+
+function renderLogs(lines) {
+  return lines.map(l => `<div class="log-line">
+    <span class="log-time">[${l.time}]</span>
+    <span class="log-level log-level-${l.lv}">${l.lv === 'ok' ? 'SUCCESS' : l.lv === 'dim' ? '' : l.lv.toUpperCase()}</span>
+    <span class="log-msg">${l.msg}</span>
+  </div>`).join('');
+}
+
+function renderTasks() {
+  const filter = document.getElementById('statusFilter').value;
+  const filtered = filter ? tasks.filter(t => t.status === filter) : tasks;
+  const tbody = document.getElementById('taskTable');
+  const empty = document.getElementById('emptyHint');
+  if (filtered.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = filtered.map(t => {
+    const algoLabel = t.algo.toUpperCase();
+    const tagC = colorMap[t.status];
+    const pc = t.status === 'completed' ? 'green' : t.status === 'failed' ? 'red' : t.status === 'running' ? 'orange' : 'grey';
+    const acts = [];
+    acts.push(`<a class="link" href="javascript:void(0)" onclick="viewDetail(${t.id})">详情</a>`);
+    if (t.status === 'pending') acts.push(`<a class="link" href="javascript:void(0)" onclick="submitTask(${t.id})">提交执行</a>`);
+    if (['queued','running'].includes(t.status)) acts.push(`<a class="link link-danger" href="javascript:void(0)" onclick="cancelTask(${t.id})">取消</a>`);
+    if (t.status === 'failed') acts.push(`<a class="link" href="javascript:void(0)" onclick="retryTask(${t.id})">🔄 重试</a>`);
+    if (t.status === 'completed') acts.push(`<a class="link" href="javascript:void(0)" onclick="alert('下载量化模型: ${t.name}')">⬇ 下载</a>`);
+    if (['completed','failed','cancelled'].includes(t.status)) acts.push(`<a class="link link-danger" href="javascript:void(0)" onclick="deleteTask(${t.id})">删除</a>`);
+    const resultLink = t.resultModelId ? `<a class="link" href="javascript:void(0)" onclick="alert('跳转到模型详情 ID=${t.resultModelId}')">#${t.resultModelId}</a>` : '<span style="color:#d9d9d9;">-</span>';
+    return `<tr>
+      <td><div><b>${t.name}</b><div style="font-size:12px;color:#8c8c8c;margin-top:2px;">${t.hf_id}</div></div></td>
+      <td><span class="tag tag-${tagC}">${algoLabel} W${t.wBits}A${t.aBits}</span></td>
+      <td><span class="status-badge"><span class="dot dot-${t.status}"></span>${statusMap[t.status]}</span></td>
+      <td><div class="progress-wrap"><div class="progress-bar"><div class="progress-fill progress-fill-${pc}" style="width:${t.progress}%"></div></div><span class="progress-text">${t.progress}%</span></div></td>
+      <td>${resultLink}</td>
+      <td>${acts.join(' ')}</td>
+    </tr>`;
+  }).join('');
+}
+
+function viewDetail(id) {
+  const t = tasks.find(x => x.id === id); if (!t) return;
+  document.getElementById('dName').textContent = t.name;
+  document.getElementById('dModel').innerHTML = `<code style="background:#f5f5f5;padding:1px 6px;border-radius:4px;">${t.hf_id}</code>`;
+  document.getElementById('dAlgo').innerHTML = `<span class="tag tag-${colorMap[t.status]}">${t.algo.toUpperCase()}</span>`;
+  document.getElementById('dPrecision').textContent = `W${t.wBits}A${t.aBits}`;
+  document.getElementById('dGroup').textContent = t.gSize;
+  document.getElementById('dCalib').textContent = `${t.calibSamples} 条（${t.calibSource === 'default' ? '默认 wikitext-2' : '自定义校准'}）`;
+  document.getElementById('dOutput').innerHTML = t.output_path ? `<code style="background:#f5f5f5;padding:1px 6px;border-radius:4px;">${t.output_path}</code>` : '<span style="color:#d9d9d9;">-</span>';
+  document.getElementById('dResult').innerHTML = t.resultModelId
+    ? `<a class="link" href="javascript:void(0)" onclick="alert('跳转至模型 ID=${t.resultModelId}')">模型 #${t.resultModelId} →</a>`
+    : '<span style="color:#d9d9d9;">-</span>';
+  document.getElementById('dError').textContent = t.err || '-';
+  document.getElementById('dCreator').textContent = t.created_by;
+  document.getElementById('dCreated').textContent = t.created_at;
+  const panel = document.getElementById('logPanel');
+  panel.innerHTML = renderLogs(logs[t.status] || logs.pending);
+  document.getElementById('logStatus').textContent = statusMap[t.status];
+  document.getElementById('detailModal').classList.add('show');
+}
+function closeDetail() { document.getElementById('detailModal').classList.remove('show'); }
+
+function openCreate() {
+  document.getElementById('createModal').classList.add('show');
+  document.getElementById('taskName').value = '';
+  document.getElementById('outputName').value = '';
+}
+function closeCreate() { document.getElementById('createModal').classList.remove('show'); }
+
+function toggleCalibInput() {
+  const v = document.getElementById('calibSource').value;
+  document.getElementById('calibTextArea').style.display = v === 'custom' ? 'block' : 'none';
+  document.getElementById('fileUploadBtn').style.display = v === 'custom' ? 'inline-flex' : 'none';
+}
+
+function applyTemplate(algo, wBits, gSize) {
+  document.getElementById('algorithm').value = algo;
+  document.getElementById('weightBits').value = String(wBits);
+  document.getElementById('groupSize').value = String(gSize);
+  document.querySelectorAll('.template-chip').forEach(c => c.style.background='#fff');
+  event.target.style.background = '#e6f7ff';
+}
+function handleFile(e) {
+  const file = e.target.files[0]; if (!file) return;
+  document.getElementById('calibText').value = `（已上传文件: ${file.name}, ${(file.size/1024).toFixed(1)} KB）`;
+}
+
+function createTask() {
+  const name = document.getElementById('taskName').value.trim();
+  const hf = document.getElementById('hfModelId').value.trim();
+  if (!name) { alert('请输入任务名称'); return; }
+  if (!hf) { alert('请输入 HuggingFace 模型 ID'); return; }
+  closeCreate();
+  const algo = document.getElementById('algorithm').value;
+  const wBits = parseInt(document.getElementById('weightBits').value);
+  const gSize = parseInt(document.getElementById('groupSize').value);
+  tasks.unshift({
+    id: ++taskIdCounter, name, hf_id: hf,
+    output_name: document.getElementById('outputName').value.trim(),
+    algo, wBits, aBits: 16, gSize,
+    calibSamples: parseInt(document.getElementById('calibSamples').value) || 256,
+    calibSource: document.getElementById('calibSource').value,
+    output_path: null, status: 'pending', progress: 0,
+    err: null, resultModelId: null, created_by: 'admin',
+    created_at: new Date().toLocaleString(),
+  });
+  renderTasks();
+}
+function submitTask(id) { const t = tasks.find(x => x.id === id); if(t){t.status='queued';t.progress=0;renderTasks();} }
+function cancelTask(id) { const t = tasks.find(x => x.id === id); if(t && confirm('确定取消任务: '+t.name+'？')){t.status='cancelled';renderTasks();} }
+function retryTask(id) { const t = tasks.find(x => x.id === id); if(t){t.status='queued';t.progress=0;t.err=null;renderTasks();} }
+function deleteTask(id) { tasks = tasks.filter(x => x.id !== id); renderTasks(); }
+
+renderTasks();
+</script>
+</body>
+</html>

@@ -32,3 +32,8 @@ htmlcov/
 *.log
 logs/
 *.zip
+
+# 第三方源码转储 / 压测产物（不纳入版本库）
+_tmp_evalscope/
+guidellm/
+perf_report_*.html

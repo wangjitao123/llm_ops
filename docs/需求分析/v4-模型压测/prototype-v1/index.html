@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>模型压测 - 原型 v1</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5}
+  .app-layout{display:flex;min-height:100vh}
+  .sidebar{width:240px;background:#001529;color:#fff;flex-shrink:0;display:flex;flex-direction:column}
+  .sidebar-logo{padding:20px 16px;border-bottom:1px solid rgba(255,255,255,.1)}
+  .sidebar-logo h2{font-size:18px;font-weight:700}
+  .sidebar-logo small{font-size:11px;opacity:.6}
+  .sidebar-nav{flex:1;padding:8px 0;overflow-y:auto}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:12px 20px;cursor:pointer;color:rgba(255,255,255,.65);border-left:3px solid transparent}
+  .nav-item:hover{color:#fff;background:rgba(255,255,255,.08)}
+  .nav-item.active{color:#fff;background:#1890ff;border-left-color:#1890ff}
+  .nav-item i{font-size:18px;width:20px;text-align:center}
+  .nav-item .badge{margin-left:auto}
+  .nav-section-title{padding:12px 20px 4px;font-size:11px;text-transform:uppercase;color:rgba(255,255,255,.35);letter-spacing:1px}
+  .main-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  .topbar{height:56px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+  .topbar h5{font-size:16px;font-weight:600;margin:0}
+  .content{flex:1;padding:24px;overflow-y:auto}
+  .stat-card{background:#fff;border-radius:8px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .stat-card .stat-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px}
+  .stat-card .stat-value{font-size:28px;font-weight:700;line-height:1.2}
+  .stat-card .stat-label{font-size:13px;color:#8c8c8c;margin-top:4px}
+  .table-card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .table-card .card-header{padding:16px 20px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between}
+  .table-card table{margin:0}
+  .table-card th{background:#fafafa;font-weight:600;font-size:13px;color:#595959}
+  .table-card td{vertical-align:middle}
+  .badge-status{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500}
+  .st-running{background:#e6f7ff;color:#1890ff;border:1px solid #91d5ff}
+  .st-done{background:#f6ffed;color:#52c41a;border:1px solid #b7eb8f}
+  .st-failed{background:#fff2f0;color:#ff4d4f;border:1px solid #ffccc7}
+  .st-pending{background:#fafafa;color:#8c8c8c;border:1px solid #d9d9d9}
+  .modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:1050;justify-content:center;align-items:flex-start;padding-top:40px}
+  .modal-overlay.show{display:flex}
+  .modal-dialog{width:880px;max-width:94vw;max-height:90vh;background:#fff;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.2);display:flex;flex-direction:column;overflow:hidden}
+  .modal-header{padding:16px 24px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between}
+  .modal-body{padding:24px;overflow-y:auto;flex:1}
+  .modal-footer{padding:12px 24px;border-top:1px solid #f0f0f0;display:flex;justify-content:flex-end;gap:8px}
+  .proto-badge{position:fixed;bottom:12px;right:12px;background:#722ed1;color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;z-index:9999;opacity:.8;pointer-events:none}
+  .cfg-section{border:1px solid #f0f0f0;border-radius:8px;padding:16px;margin-bottom:12px}
+  .cfg-section .sec-label{font-weight:600;font-size:14px;margin-bottom:10px}
+  .step-no{width:22px;height:22px;border-radius:50%;background:#1890ff;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;margin-right:8px}
+  .tpl-tag{cursor:pointer;display:inline-block;padding:4px 12px;border-radius:14px;font-size:12px;border:1px solid #d9d9d9;background:#fafafa;margin:0 4px 8px 0}
+  .tpl-tag:hover{border-color:#1890ff;color:#1890ff}
+  .tpl-tag.rec{background:#e6f7ff;border-color:#91d5ff;color:#1890ff}
+  .metric-box{background:#fafafa;border-radius:8px;padding:14px;text-align:center;height:100%}
+  .metric-box .m-label{font-size:12px;color:#8c8c8c}
+  .metric-box .m-value{font-size:24px;font-weight:700;line-height:1.25;margin-top:2px}
+  .metric-box .m-unit{font-size:12px;font-weight:400;color:#8c8c8c}
+  .bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px}
+  .bar-row .bar-label{width:76px;color:#595959;flex-shrink:0}
+  .bar-row .bar-track{flex:1;background:#f5f5f5;border-radius:4px;height:16px;overflow:hidden}
+  .bar-row .bar-fill{height:100%;background:linear-gradient(90deg,#1890ff,#69c0ff);border-radius:4px}
+  .bar-row .bar-val{width:64px;text-align:right;color:#595959;flex-shrink:0}
+  .log-box{background:#1a1a2e;color:#d4d4d4;border-radius:8px;padding:14px;font-family:Consolas,monospace;font-size:12.5px;line-height:1.7;max-height:240px;overflow-y:auto}
+  .log-box .t{color:#6a9955}.log-box .i{color:#569cd6}.log-box .e{color:#f44747}.log-box .ok{color:#52c41a}.log-box .w{color:#dcdcaa}
+</style>
+</head>
+<body>
+<div class="app-layout">
+  <!-- ===== 侧边栏 ===== -->
+  <div class="sidebar">
+    <div class="sidebar-logo"><h2><i class="bi bi-cpu me-2"></i>AI 网关</h2><small>大模型监测管理平台</small></div>
+    <div class="sidebar-nav">
+      <div class="nav-item"><i class="bi bi-grid-1x2"></i><span>总览大屏</span></div>
+      <div class="nav-section-title">核心管理</div>
+      <div class="nav-item"><i class="bi bi-box"></i><span>模型管理</span><span class="badge bg-success rounded-pill">6</span></div>
+      <div class="nav-item"><i class="bi bi-key"></i><span>Key 管理</span></div>
+      <div class="nav-item"><i class="bi bi-bar-chart"></i><span>Token 统计</span></div>
+      <div class="nav-item"><i class="bi bi-router"></i><span>统一网关</span></div>
+      <div class="nav-section-title">进阶能力</div>
+      <div class="nav-item"><i class="bi bi-activity"></i><span>模型对比评估</span></div>
+      <div class="nav-item"><i class="bi bi-magic"></i><span>模型微调</span></div>
+      <div class="nav-item"><i class="bi bi-lightbulb"></i><span>模型量化</span><span class="badge bg-info rounded-pill">NEW</span></div>
+      <div class="nav-item"><i class="bi bi-cloud-upload"></i><span>模型部署</span><span class="badge bg-info rounded-pill">NEW</span></div>
+      <!-- ★ 新增 -->
+      <div class="nav-item active"><i class="bi bi-speedometer2"></i><span>模型压测</span><span class="badge bg-info rounded-pill">NEW</span></div>
+      <div class="nav-section-title">系统管理</div>
+      <div class="nav-item"><i class="bi bi-gear"></i><span>系统配置</span></div>
+    </div>
+  </div>
+
+  <!-- ===== 主区 ===== -->
+  <div class="main-area">
+    <div class="topbar">
+      <h5>模型压测</h5>
+      <div style="font-size:13px;color:#8c8c8c"><i class="bi bi-lightning-charge me-1"></i>引擎: EvalScope perf · Apache-2.0</div>
+    </div>
+    <div class="content">
+
+      <!-- 提示条 -->
+      <div class="alert alert-light border d-flex align-items-start gap-2" style="font-size:13px">
+        <i class="bi bi-info-circle text-primary"></i>
+        <div>
+          压测会以真实流量打向目标模型，占用其并发能力。<b>建议对已部署的自建模型执行</b>，避免压测外部付费模型产生费用。
+          压力规模受压测 worker 配置限制。
+        </div>
+      </div>
+
+      <!-- 统计卡片 -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="stat-card d-flex align-items-center gap-3">
+            <div class="stat-icon" style="background:#e6f7ff;color:#1890ff"><i class="bi bi-speedometer2"></i></div>
+            <div><div class="stat-value">18</div><div class="stat-label">累计压测任务</div></div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="stat-card d-flex align-items-center gap-3">
+            <div class="stat-icon" style="background:#f6ffed;color:#52c41a"><i class="bi bi-check2-circle"></i></div>
+            <div><div class="stat-value">15</div><div class="stat-label">成功完成</div></div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="stat-card d-flex align-items-center gap-3">
+            <div class="stat-icon" style="background:#fffbe6;color:#faad14"><i class="bi bi-hourglass-split"></i></div>
+            <div><div class="stat-value">1</div><div class="stat-label">运行中</div></div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="stat-card d-flex align-items-center gap-3">
+            <div class="stat-icon" style="background:#fff0f6;color:#eb2f96"><i class="bi bi-stopwatch"></i></div>
+            <div><div class="stat-value">213<span style="font-size:14px">ms</span></div><div class="stat-label">最近一次 TTFT(P99)</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 工具条 -->
+      <div class="stat-card mb-3" style="padding:12px 20px">
+        <div class="row align-items-center g-2">
+          <div class="col-auto">
+            <select class="form-select form-select-sm" style="width:130px">
+              <option>全部状态</option><option>排队中</option><option>运行中</option><option>已完成</option><option>失败</option><option>已取消</option>
+            </select>
+          </div>
+          <div class="col-auto">
+            <select class="form-select form-select-sm" style="width:170px">
+              <option>全部模型</option><option>qwen38-multimodal</option><option>qwen2.5-7b-gptq</option><option>deepseek-r1-vllm</option>
+            </select>
+          </div>
+          <div class="col"><input class="form-control form-control-sm" style="max-width:220px" placeholder="搜索任务名称..." /></div>
+          <div class="col-auto d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-clockwise"></i> 刷新</button>
+            <button class="btn btn-primary btn-sm" onclick="showCreate()"><i class="bi bi-plus-lg"></i> 新建压测</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 任务列表 -->
+      <div class="table-card">
+        <div class="card-header"><span>压测任务 <small class="text-muted">共 6 个</small></span></div>
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th style="width:18%">任务名称</th>
+                <th style="width:15%">目标模型</th>
+                <th style="width:10%">模式</th>
+                <th style="width:12%">压力参数</th>
+                <th style="width:13%">状态</th>
+                <th style="width:9%">TTFT(P99)</th>
+                <th style="width:9%">吞吐</th>
+                <th style="width:14%">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="fw-medium"><a href="#" class="text-decoration-none" onclick="showDetail('qwen38 并发200基准')">qwen38 并发200基准</a><div class="text-muted" style="font-size:12px">2026-01-05 14:02</div></td>
+                <td><span class="badge bg-dark">qwen38-multimodal</span></td>
+                <td><span class="badge bg-light text-dark border">闭环并发</span></td>
+                <td><small>并发 200 · 2000 请求</small></td>
+                <td>
+                  <span class="badge-status st-running">运行中</span>
+                  <div class="progress mt-1" style="height:5px"><div class="progress-bar progress-bar-striped progress-bar-animated" style="width:62%"></div></div>
+                  <small class="text-muted">1240 / 2000</small>
+                </td>
+                <td><span class="text-muted">--</span></td>
+                <td><span class="text-muted">--</span></td>
+                <td>
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" onclick="showDetail('qwen38 并发200基准')" title="日志"><i class="bi bi-journal-text"></i></button>
+                    <button class="btn btn-outline-danger" title="中止"><i class="bi bi-stop-fill"></i></button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="fw-medium"><a href="#" class="text-decoration-none" onclick="showDetail('7B-GPTQ 量化后验证')">7B-GPTQ 量化后验证</a><div class="text-muted" style="font-size:12px">2026-01-04 16:30</div></td>
+                <td><span class="badge bg-dark">qwen2.5-7b-gptq</span></td>
+                <td><span class="badge bg-light text-dark border">开环限速</span></td>
+                <td><small>20 RPS · 3000 请求</small></td>
+                <td><span class="badge-status st-done">已完成</span><div class="text-muted" style="font-size:12px">耗时 2分41秒</div></td>
+                <td><b style="color:#52c41a">186 ms</b></td>
+                <td><b>1284 tok/s</b></td>
+                <td>
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" onclick="showDetail('7B-GPTQ 量化后验证')" title="查看结果"><i class="bi bi-graph-up"></i></button>
+                    <button class="btn btn-outline-secondary" title="重跑"><i class="bi bi-arrow-repeat"></i></button>
+                    <button class="btn btn-outline-secondary" title="导出报告"><i class="bi bi-download"></i></button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="fw-medium"><a href="#" class="text-decoration-none" onclick="showDetail('SLA 自动找拐点')">SLA 自动找拐点</a><div class="text-muted" style="font-size:12px">2026-01-04 11:15</div></td>
+                <td><span class="badge bg-dark">deepseek-r1-vllm</span></td>
+                <td><span class="badge bg-light text-dark border">SLA 调压</span></td>
+                <td><small>TTFT≤500ms · 逐级+50</small></td>
+                <td><span class="badge-status st-done">已完成</span><div class="text-muted" style="font-size:12px">拐点: 并发 320</div></td>
+                <td><b style="color:#faad14">482 ms</b></td>
+                <td><b>2013 tok/s</b></td>
+                <td>
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" onclick="showDetail('SLA 自动找拐点')"><i class="bi bi-graph-up"></i></button>
+                    <button class="btn btn-outline-secondary"><i class="bi bi-arrow-repeat"></i></button>
+                    <button class="btn btn-outline-secondary"><i class="bi bi-download"></i></button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="fw-medium"><a href="#" class="text-decoration-none" onclick="showDetail('qwen38 多轮对话压测')">qwen38 多轮对话压测</a><div class="text-muted" style="font-size:12px">2026-01-03 20:08</div></td>
+                <td><span class="badge bg-dark">qwen38-multimodal</span></td>
+                <td><span class="badge bg-light text-dark border">多轮对话</span></td>
+                <td><small>并发 50 · 5 轮</small></td>
+                <td><span class="badge-status st-done">已完成</span></td>
+                <td><b style="color:#52c41a">241 ms</b></td>
+                <td><b>642 tok/s</b></td>
+                <td>
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" onclick="showDetail('qwen38 多轮对话压测')"><i class="bi bi-graph-up"></i></button>
+                    <button class="btn btn-outline-secondary"><i class="bi bi-arrow-repeat"></i></button>
+                    <button class="btn btn-outline-secondary"><i class="bi bi-download"></i></button>
+                  </div>
+                </td>
+              </tr>
+              <tr class="table-danger">
+                <td class="fw-medium"><a href="#" class="text-decoration-none" onclick="showDetail('高并发极限 (1000)')">高并发极限 (1000)</a><div class="text-muted" style="font-size:12px">2026-01-03 09:22</div></td>
+                <td><span class="badge bg-dark">qwen2.5-7b-gptq</span></td>
+                <td><span class="badge bg-light text-dark border">闭环并发</span></td>
+                <td><small>并发 1000 · 5000 请求</small></td>
+                <td><span class="badge-status st-failed">失败</span><div class="text-muted" style="font-size:12px">成功率 61% · 大量 429</div></td>
+                <td><span class="text-danger">--</span></td>
+                <td><span class="text-danger">--</span></td>
+                <td>
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" onclick="showDetail('高并发极限 (1000)')"><i class="bi bi-graph-up"></i></button>
+                    <button class="btn btn-outline-secondary"><i class="bi bi-arrow-repeat"></i></button>
+                    <button class="btn btn-outline-danger"><i class="bi bi-trash"></i></button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="fw-medium"><span class="text-muted">qwen38 默认参数试跑</span><div class="text-muted" style="font-size:12px">2026-01-02 10:00</div></td>
+                <td><span class="badge bg-dark">qwen38-multimodal</span></td>
+                <td><span class="badge bg-light text-dark border">闭环并发</span></td>
+                <td><small>并发 10 · 100 请求</small></td>
+                <td><span class="badge-status st-done">已完成</span></td>
+                <td><b style="color:#52c41a">142 ms</b></td>
+                <td><b>318 tok/s</b></td>
+                <td><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-graph-up"></i></button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 新建压测 ============ -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h6 class="mb-0 fw-bold"><i class="bi bi-speedometer2 me-1"></i>新建压测任务</h6>
+      <button class="btn-close" onclick="hideCreate()"></button>
+    </div>
+    <div class="modal-body">
+      <!-- 快速模板 -->
+      <div style="background:#fafafa;border-radius:8px;padding:12px;border:1px solid #f0f0f0;margin-bottom:14px">
+        <small class="text-muted">⚡ 快速模板</small>
+        <div style="margin-top:4px">
+          <span class="tpl-tag rec" onclick="tpl('smoke')">冒烟试跑 50 并发</span>
+          <span class="tpl-tag" onclick="tpl('baseline')">标准基准 200 并发</span>
+          <span class="tpl-tag" onclick="tpl('sla')">SLA 找拐点</span>
+          <span class="tpl-tag" onclick="tpl('stress')">极限压测 500 并发</span>
+        </div>
+      </div>
+
+      <!-- 1 目标模型 -->
+      <div class="cfg-section">
+        <div class="sec-label"><span class="step-no">1</span>目标模型</div>
+        <div class="row g-3">
+          <div class="col-7">
+            <label class="form-label">选择模型 <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm">
+              <option>qwen38-multimodal — http://10.51.13.7:8027/v1</option>
+              <option>qwen2.5-7b-gptq — http://dpl-1-vllm-31100:8000/v1</option>
+              <option>deepseek-r1-vllm — http://10.51.13.7:31000/v1</option>
+            </select>
+            <small class="text-muted">URL 与 API Key 自动从「模型管理」带出</small>
+          </div>
+          <div class="col-5">
+            <label class="form-label">任务名称</label>
+            <input class="form-control form-control-sm" value="qwen38 标准基准" />
+          </div>
+        </div>
+      </div>
+
+      <!-- 2 压测模式 -->
+      <div class="cfg-section">
+        <div class="sec-label"><span class="step-no">2</span>压测模式</div>
+        <div class="row g-2 mb-3">
+          <div class="col-3">
+            <div class="form-check border rounded p-2">
+              <input class="form-check-input" type="radio" name="mode" id="mClosed" checked />
+              <label class="form-check-label small" for="mClosed"><b>闭环并发</b><br><span class="text-muted">固定并发打满</span></label>
+            </div>
+          </div>
+          <div class="col-3">
+            <div class="form-check border rounded p-2">
+              <input class="form-check-input" type="radio" name="mode" id="mOpen" />
+              <label class="form-check-label small" for="mOpen"><b>开环限速</b><br><span class="text-muted">按目标 RPS</span></label>
+            </div>
+          </div>
+          <div class="col-3">
+            <div class="form-check border rounded p-2">
+              <input class="form-check-input" type="radio" name="mode" id="mSla" />
+              <label class="form-check-label small" for="mSla"><b>SLA 调压</b><br><span class="text-muted">自动找拐点</span></label>
+            </div>
+          </div>
+          <div class="col-3">
+            <div class="form-check border rounded p-2">
+              <input class="form-check-input" type="radio" name="mode" id="mMulti" />
+              <label class="form-check-label small" for="mMulti"><b>多轮对话</b><br><span class="text-muted">带上下文</span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 闭环 -->
+        <div id="paneClosed">
+          <div class="row g-3">
+            <div class="col-4">
+              <label class="form-label">并发数 <span class="text-danger">*</span></label>
+              <input class="form-control form-control-sm" value="200" />
+              <small class="text-muted">同时发起的请求数</small>
+            </div>
+            <div class="col-4">
+              <label class="form-label">总请求数 <span class="text-danger">*</span></label>
+              <input class="form-control form-control-sm" value="2000" />
+            </div>
+            <div class="col-4">
+              <label class="form-label">压测时长上限</label>
+              <input class="form-control form-control-sm" value="600" placeholder="秒，超时自动停止" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 开环 -->
+        <div id="paneOpen" style="display:none">
+          <div class="row g-3">
+            <div class="col-4">
+              <label class="form-label">目标 RPS <span class="text-danger">*</span></label>
+              <input class="form-control form-control-sm" value="20" />
+            </div>
+            <div class="col-4">
+              <label class="form-label">总请求数 <span class="text-danger">*</span></label>
+              <input class="form-control form-control-sm" value="3000" />
+            </div>
+            <div class="col-4">
+              <label class="form-label">并发上限</label>
+              <input class="form-control form-control-sm" value="500" />
+            </div>
+          </div>
+        </div>
+
+        <!-- SLA -->
+        <div id="paneSla" style="display:none">
+          <div class="row g-3">
+            <div class="col-4">
+              <label class="form-label">SLA 指标</label>
+              <select class="form-select form-select-sm">
+                <option>TTFT (首 token)</option>
+                <option>TPOT (每 token)</option>
+                <option>端到端延迟</option>
+              </select>
+            </div>
+            <div class="col-4">
+              <label class="form-label">SLA 阈值 (ms)</label>
+              <input class="form-control form-control-sm" value="500" />
+            </div>
+            <div class="col-2">
+              <label class="form-label">搜索下界</label>
+              <input class="form-control form-control-sm" value="10" />
+            </div>
+            <div class="col-2">
+              <label class="form-label">搜索上界</label>
+              <input class="form-control form-control-sm" value="400" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 多轮 -->
+        <div id="paneMulti" style="display:none">
+          <div class="row g-3">
+            <div class="col-4">
+              <label class="form-label">并发数</label>
+              <input class="form-control form-control-sm" value="50" />
+            </div>
+            <div class="col-4">
+              <label class="form-label">对话轮数</label>
+              <input class="form-control form-control-sm" value="5" />
+            </div>
+            <div class="col-4">
+              <label class="form-label">每轮请求数</label>
+              <input class="form-control form-control-sm" value="200" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 输入构造 -->
+      <div class="cfg-section">
+        <div class="sec-label"><span class="step-no">3</span>输入构造（数据集）</div>
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="form-label">数据集类型</label>
+            <select class="form-select form-select-sm" onchange="dsChange(this.value)">
+              <option value="random">random — 按 token 长度随机生成（推荐压测）</option>
+              <option value="openqa">openqa — 开放问答</option>
+              <option value="speed_benchmark">speed_benchmark — 固定 prompt 测速</option>
+              <option value="share_gpt">share_gpt — 真实对话</option>
+              <option value="line_by_line">line_by_line — 每行一条</option>
+              <option value="longalpaca">longalpaca — 长上下文</option>
+            </select>
+          </div>
+          <div class="col-3">
+            <label class="form-label">输入长度 (token)</label>
+            <input class="form-control form-control-sm" value="1024" />
+          </div>
+          <div class="col-3">
+            <label class="form-label">输出长度 (token)</label>
+            <input class="form-control form-control-sm" value="256" />
+          </div>
+          <div class="col-12" id="customDs" style="display:none">
+            <label class="form-label">自定义数据集文件</label>
+            <div style="border:2px dashed #d9d9d9;border-radius:8px;padding:20px;text-align:center;background:#fafafa">
+              <i class="bi bi-upload" style="font-size:22px;color:#8c8c8c"></i>
+              <p class="mt-1 mb-0 text-muted small">拖拽或点击上传 .jsonl（每行一条 prompt）</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 高级 -->
+      <div class="cfg-section">
+        <div class="sec-label"><span class="step-no">4</span>高级设置</div>
+        <div class="row g-3">
+          <div class="col-3">
+            <label class="form-label">stream</label>
+            <select class="form-select form-select-sm"><option>开启（可测 TTFT）</option><option>关闭</option></select>
+          </div>
+          <div class="col-3">
+            <label class="form-label">temperature</label>
+            <input class="form-control form-control-sm" value="0" />
+          </div>
+          <div class="col-3">
+            <label class="form-label">请求超时 (s)</label>
+            <input class="form-control form-control-sm" value="60" />
+          </div>
+          <div class="col-3">
+            <label class="form-label">tokenizer</label>
+            <input class="form-control form-control-sm" placeholder="留空按模型自动" />
+          </div>
+        </div>
+        <div class="form-check mt-3">
+          <input class="form-check-input" type="checkbox" id="excludeStats" checked />
+          <label class="form-check-label small" for="excludeStats">压测流量不计入 Token 用量统计（避免污染费用报表）</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline-secondary" onclick="hideCreate()">取消</button>
+      <button class="btn btn-primary" onclick="hideCreate()"><i class="bi bi-play-fill me-1"></i>开始压测</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 结果详情 ============ -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-dialog" style="width:960px">
+    <div class="modal-header">
+      <h6 class="mb-0 fw-bold">压测结果 — <span id="dTitle">7B-GPTQ 量化后验证</span></h6>
+      <button class="btn-close" onclick="hideDetail()"></button>
+    </div>
+    <div class="modal-body">
+      <ul class="nav nav-tabs mb-3 small">
+        <li class="nav-item"><a class="nav-link active" href="#" onclick="event.preventDefault()">核心指标</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="event.preventDefault()">延迟分布</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="event.preventDefault()">错误分析</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="event.preventDefault()">历史对比</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" onclick="event.preventDefault()">运行日志</a></li>
+      </ul>
+
+      <!-- 配置回显 -->
+      <div style="background:#fafafa;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12.5px">
+        <i class="bi bi-sliders me-1"></i>
+        目标 <b>qwen2.5-7b-gptq</b> · 开环限速 <b>20 RPS</b> · 3000 请求 · random 数据集 <b>1024→256</b> token · stream 开启
+        <span class="text-muted">（耗时 2分41秒）</span>
+      </div>
+
+      <!-- 指标卡片 -->
+      <div class="row g-2 mb-3">
+        <div class="col-3">
+          <div class="metric-box">
+            <div class="m-label">TTFT 均值</div>
+            <div class="m-value" style="color:#52c41a">142<span class="m-unit">ms</span></div>
+            <div class="m-label">P99 186ms</div>
+          </div>
+        </div>
+        <div class="col-3">
+          <div class="metric-box">
+            <div class="m-label">TPOT</div>
+            <div class="m-value">18.6<span class="m-unit">ms</span></div>
+            <div class="m-label">每 token</div>
+          </div>
+        </div>
+        <div class="col-3">
+          <div class="metric-box">
+            <div class="m-label">输出吞吐</div>
+            <div class="m-value" style="color:#1890ff">1284<span class="m-unit">tok/s</span></div>
+            <div class="m-label">输入 5120 tok/s</div>
+          </div>
+        </div>
+        <div class="col-3">
+          <div class="metric-box">
+            <div class="m-label">成功率</div>
+            <div class="m-value" style="color:#52c41a">100<span class="m-unit">%</span></div>
+            <div class="m-label">3000 / 3000</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 延迟分布 -->
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="fw-semibold mb-2" style="font-size:13px">TTFT 分位</div>
+          <div class="bar-row"><span class="bar-label">P50</span><span class="bar-track"><span class="bar-fill" style="width:30%"></span></span><span class="bar-val">112 ms</span></div>
+          <div class="bar-row"><span class="bar-label">P90</span><span class="bar-track"><span class="bar-fill" style="width:44%"></span></span><span class="bar-val">158 ms</span></div>
+          <div class="bar-row"><span class="bar-label">P95</span><span class="bar-track"><span class="bar-fill" style="width:49%"></span></span><span class="bar-val">172 ms</span></div>
+          <div class="bar-row"><span class="bar-label">P99</span><span class="bar-track"><span class="bar-fill" style="width:53%"></span></span><span class="bar-val">186 ms</span></div>
+          <div class="bar-row"><span class="bar-label">Max</span><span class="bar-track"><span class="bar-fill" style="width:82%;background:linear-gradient(90deg,#faad14,#ffc53d)"></span></span><span class="bar-val">412 ms</span></div>
+        </div>
+        <div class="col-md-6">
+          <div class="fw-semibold mb-2" style="font-size:13px">端到端延迟分位</div>
+          <div class="bar-row"><span class="bar-label">P50</span><span class="bar-track"><span class="bar-fill" style="width:22%"></span></span><span class="bar-val">1.2 s</span></div>
+          <div class="bar-row"><span class="bar-label">P90</span><span class="bar-track"><span class="bar-fill" style="width:38%"></span></span><span class="bar-val">2.4 s</span></div>
+          <div class="bar-row"><span class="bar-label">P95</span><span class="bar-track"><span class="bar-fill" style="width:45%"></span></span><span class="bar-val">3.1 s</span></div>
+          <div class="bar-row"><span class="bar-label">P99</span><span class="bar-track"><span class="bar-fill" style="width:56%"></span></span><span class="bar-val">4.8 s</span></div>
+          <div class="bar-row"><span class="bar-label">Max</span><span class="bar-track"><span class="bar-fill" style="width:74%;background:linear-gradient(90deg,#faad14,#ffc53d)"></span></span><span class="bar-val">7.2 s</span></div>
+        </div>
+      </div>
+
+      <!-- 日志 -->
+      <div style="margin-top:16px">
+        <div class="fw-semibold mb-1" style="font-size:13px">运行日志</div>
+        <div class="log-box">
+          <div><span class="t">[16:30:02]</span> <span class="i">INFO</span> 加载压测配置, 目标 http://dpl-1-vllm-31100:8000/v1</div>
+          <div><span class="t">[16:30:03]</span> <span class="i">INFO</span> tokenizer 加载完成: Qwen/Qwen2.5-7B-Instruct</div>
+          <div><span class="t">[16:30:04]</span> <span class="i">INFO</span> 生成数据集 random 1024→256, 3000 条</div>
+          <div><span class="t">[16:30:05]</span> <span class="i">INFO</span> 预热连接池, 并发上限 500</div>
+          <div><span class="t">[16:30:06]</span> <span class="ok">OK</span> 开始压测: 开环 20 RPS x 3000</div>
+          <div><span class="t">[16:31:06]</span> <span class="i">INFO</span> 进度 1200/3000 (40%), 当前 RPS 20.0, 成功率 100%</div>
+          <div><span class="t">[16:32:06]</span> <span class="i">INFO</span> 进度 2400/3000 (80%), 当前 RPS 20.0, 成功率 100%</div>
+          <div><span class="t">[16:32:43]</span> <span class="ok">OK</span> 压测完成, 耗时 2分41秒</div>
+          <div><span class="t">[16:32:44]</span> <span class="i">INFO</span> 生成 HTML 报告: outputs/20260104_163002/perf_report.html</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-download"></i> 导出 HTML 报告</button>
+      <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-repeat"></i> 用相同参数重跑</button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="hideDetail()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="proto-badge">原型 v1 · 压测基于 EvalScope perf</div>
+
+<script>
+function showCreate(){document.getElementById('createModal').classList.add('show')}
+function hideCreate(){document.getElementById('createModal').classList.remove('show')}
+function showDetail(t){document.getElementById('dTitle').textContent=t;document.getElementById('detailModal').classList.add('show')}
+function hideDetail(){document.getElementById('detailModal').classList.remove('show')}
+function tpl(k){alert('已应用模板: '+k)}
+function dsChange(v){document.getElementById('customDs').style.display = v==='line_by_line' ? 'block':'none'}
+['mClosed','mOpen','mSla','mMulti'].forEach(function(id){
+  document.getElementById(id).addEventListener('change', function(){
+    document.getElementById('paneClosed').style.display = id==='mClosed'?'block':'none';
+    document.getElementById('paneOpen').style.display   = id==='mOpen'?'block':'none';
+    document.getElementById('paneSla').style.display    = id==='mSla'?'block':'none';
+    document.getElementById('paneMulti').style.display  = id==='mMulti'?'block':'none';
+  });
+});
+document.getElementById('createModal').addEventListener('click',function(e){if(e.target===this)hideCreate()});
+document.getElementById('detailModal').addEventListener('click',function(e){if(e.target===this)hideDetail()});
+</script>
+</body>
+</html>

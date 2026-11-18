@@ -82,6 +82,8 @@ class FakeUpstream:
 
 
 class FakeClient:
+    """占位：共享客户端不再由流转发逻辑关闭（见 app/core/http.py）。"""
+
     def __init__(self):
         self.closed = False
 
@@ -124,16 +126,14 @@ async def test_relay_sse_passthrough_and_backfill(monkeypatch):
         b"data: [DONE]\n\n"
     )
     upstream = FakeUpstream([sse])
-    client = FakeClient()
     session = FakeSession()
     monkeypatch.setattr(proxy_mod, "async_session", lambda: _SessionCtx(session))
 
-    gen = proxy_mod._relay_sse_stream(upstream, client, log_id=7)
+    gen = proxy_mod._relay_sse_stream(upstream, log_id=7)
     out = b"".join([c async for c in gen])
 
     assert out == sse  # 客户端收到的字节与上游完全一致
     assert upstream.closed is True
-    assert client.closed is True
     assert session.committed is True
     # 回填 UPDATE 语句的绑定参数应含 id=7 与 usage 数值
     values = []
@@ -147,11 +147,10 @@ async def test_relay_sse_no_usage_no_backfill(monkeypatch):
     """流里没有 usage（未注入生效的上游）：只透传，不产生回填更新。"""
     sse = b'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n' + b"data: [DONE]\n\n"
     upstream = FakeUpstream([sse])
-    client = FakeClient()
     session = FakeSession()
     monkeypatch.setattr(proxy_mod, "async_session", lambda: _SessionCtx(session))
 
-    out = b"".join([c async for c in proxy_mod._relay_sse_stream(upstream, client, log_id=7)])
+    out = b"".join([c async for c in proxy_mod._relay_sse_stream(upstream, log_id=7)])
 
     assert out == sse
     assert session.executed == []
@@ -164,11 +163,10 @@ async def test_relay_sse_chunk_boundaries(monkeypatch):
     sse = b'data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":6}}\n\ndata: [DONE]\n\n'
     # 拆得很碎，每次 1 字节
     upstream = FakeUpstream([bytes([b]) for b in sse])
-    client = FakeClient()
     session = FakeSession()
     monkeypatch.setattr(proxy_mod, "async_session", lambda: _SessionCtx(session))
 
-    out = b"".join([c async for c in proxy_mod._relay_sse_stream(upstream, client, log_id=3)])
+    out = b"".join([c async for c in proxy_mod._relay_sse_stream(upstream, log_id=3)])
 
     assert out == sse
     assert session.committed is True

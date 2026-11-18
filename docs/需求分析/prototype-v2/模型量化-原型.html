@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模型量化 - 原型 v2</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 220px; background: #001529; color: #fff; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; }
+.logo { padding: 20px 16px; border-bottom: 1px solid #002140; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 32px; height: 32px; background: #1890ff; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.nav { flex: 1; padding: 8px 0; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 24px; cursor: default; color: #ffffffa6; font-size: 14px; }
+.nav-item:hover { color: #fff; background: #1890ff14; }
+.nav-item.active { color: #fff; background: #1890ff; }
+.nav-icon { width: 16px; text-align: center; }
+.nav-divider { height: 1px; background: #002140; margin: 8px 16px; }
+.main { flex: 1; overflow: auto; }
+.header { background: #fff; padding: 12px 24px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; }
+.breadcrumb { font-size: 13px; color: #8c8c8c; }
+.header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: #8c8c8c; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: #1890ff; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.content { padding: 24px; }
+.page-title { font-size: 20px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
+.toolbar { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 2px #0000000a; }
+.filters { display: flex; gap: 12px; align-items: center; }
+.filter-select { padding: 4px 11px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; height: 32px; min-width: 130px; background: #fff; }
+.btn { padding: 4px 15px; border-radius: 6px; font-size: 14px; height: 32px; cursor: pointer; border: 1px solid #d9d9d9; background: #fff; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.btn-primary { background: #1890ff; border-color: #1890ff; color: #fff; }
+.btn-primary:hover { background: #40a9ff; }
+.btn-sm { height: 26px; font-size: 12px; padding: 0 10px; }
+.table-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 2px #0000000a; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+th { background: #fafafa; font-weight: 500; color: #8c8c8c; font-size: 13px; }
+tr:hover td { background: #fafafa; }
+td:last-child { white-space: nowrap; }
+.tag { display: inline-block; padding: 0 7px; border-radius: 4px; font-size: 12px; line-height: 22px; border: 1px solid; }
+.tag-blue { color: #1890ff; border-color: #1890ff14; background: #e6f7ff; }
+.tag-green { color: #52c41a; border-color: #b7eb8f; background: #f6ffed; }
+.tag-orange { color: #fa8c16; border-color: #ffd591; background: #fff7e6; }
+.tag-red { color: #ff4d4f; border-color: #ffa39e; background: #fff1f0; }
+.tag-grey { color: #8c8c8c; border-color: #d9d9d9; background: #fafafa; }
+.status { display: inline-flex; align-items: center; gap: 6px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.status-pending { background: #d9d9d9; }
+.status-queued { background: #1890ff; }
+.status-running { background: #fa8c16; }
+.status-completed { background: #52c41a; }
+.status-failed { background: #ff4d4f; }
+.status-cancelled { background: #8c8c8c; }
+.progress { display: flex; align-items: center; gap: 8px; }
+.progress-bar { flex: 1; height: 8px; background: #f5f5f5; border-radius: 10px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 10px; transition: width .3s; }
+.progress-fill-green { background: #52c41a; }
+.progress-fill-orange { background: #fa8c16; }
+.progress-fill-red { background: #ff4d4f; }
+.progress-text { font-size: 12px; color: #8c8c8c; min-width: 32px; }
+.ln { color: #1890ff; text-decoration: none; font-size: 14px; cursor: pointer; }
+.ln:hover { color: #40a9ff; text-decoration: underline; }
+.ln-danger { color: #ff4d4f; }
+.ln-danger:hover { color: #ff7875; }
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #00000045; z-index: 1000; align-items: center; justify-content: center; }
+.modal-overlay.show { display: flex; }
+.modal { background: #fff; border-radius: 8px; width: 720px; max-height: 85vh; overflow-y: auto; box-shadow: 0 6px 16px #0000001f; }
+.modal-header { padding: 16px 24px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; font-size: 16px; font-weight: 600; }
+.modal-close { width: 24px; height: 24px; border: none; background: none; font-size: 18px; cursor: pointer; color: #8c8c8c; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+.modal-close:hover { background: #f5f5f5; }
+.modal-body { padding: 24px; }
+.modal-footer { padding: 12px 24px; border-top: 1px solid #f0f0f0; display: flex; justify-content: flex-end; gap: 8px; }
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 14px; margin-bottom: 4px; color: #333; }
+.form-label .required { color: #ff4d4f; margin-left: 2px; }
+.form-row { display: flex; gap: 16px; }
+.form-row .form-group { flex: 1; }
+.form-input { width: 100%; padding: 4px 11px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; height: 32px; outline: none; }
+.form-input:focus { border-color: #1890ff; box-shadow: 0 0 0 2px #1890ff14; }
+select.form-input { cursor: pointer; }
+textarea.form-input { height: auto; min-height: 60px; resize: vertical; font-family: monospace; font-size: 13px; }
+/* ========== 参数模板按钮区 ========== */
+.template-bar { margin-bottom: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.template-btn { padding: 3px 12px; border-radius: 14px; font-size: 12px; border: 1px solid #1890ff; color: #1890ff; background: #e6f7ff; cursor: pointer; }
+.template-btn:hover { background: #1890ff; color: #fff; }
+.template-label { font-size: 13px; color: #8c8c8c; }
+/* ========== 日志面板 ========== */
+.log-panel { background: #1e1e1e; color: #ccc; border-radius: 6px; padding: 12px; font-family: 'Consolas', monospace; font-size: 13px; max-height: 200px; overflow-y: auto; margin-top: 8px; }
+.log-line { padding: 1px 0; }
+.log-line .time { color: #6a9955; }
+.log-line .info { color: #d4d4d4; }
+.log-line .warn { color: #dcdcaa; }
+.log-line .err { color: #f44747; }
+.log-line .bold { color: #569cd6; }
+/* ========== 详情描述表 ========== */
+.desc-table { width: 100%; border-collapse: collapse; }
+.desc-table td { padding: 8px 12px; border: 1px solid #f0f0f0; font-size: 14px; }
+.desc-table td:first-child { background: #fafafa; font-weight: 500; width: 120px; color: #8c8c8c; }
+.alert { padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.alert-info { background: #e6f7ff; border: 1px solid #91d5ff; color: #0050b3; }
+.alert-icon { font-size: 16px; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+.modal { animation: fadeIn .2s; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="logo"><div class="logo-icon">🧠</div><span>LLM Ops 平台</span></div>
+    <nav class="nav">
+      <div class="nav-item"><span class="nav-icon">📊</span> 总览大屏</div>
+      <div class="nav-item"><span class="nav-icon">🤖</span> 模型管理</div>
+      <div class="nav-item"><span class="nav-icon">🔑</span> Key 管理</div>
+      <div class="nav-item"><span class="nav-icon">📈</span> Token 统计</div>
+      <div class="nav-item"><span class="nav-icon">🚪</span> 统一网关</div>
+      <div class="nav-item"><span class="nav-icon">🔬</span> 模型微调</div>
+      <div class="nav-item"><span class="nav-icon">📊</span> 模型对比</div>
+      <div class="nav-item active"><span class="nav-icon">💡</span> <b>模型量化</b> <span style="margin-left:auto;font-size:11px;background:#1890ff;padding:0 6px;border-radius:4px;">NEW</span></div>
+      <div class="nav-divider"></div>
+      <div class="nav-item"><span class="nav-icon">⚙️</span> 系统管理</div>
+    </nav>
+  </aside>
+  <div class="main">
+    <div class="header">
+      <div class="breadcrumb">模型量化</div>
+      <div class="header-right"><span>admin</span><div class="avatar">A</div></div>
+    </div>
+    <div class="content">
+      <div class="page-title"><span>量化任务管理</span></div>
+      <div class="alert alert-info">
+        <span class="alert-icon">💡</span>
+        <span>将 HuggingFace 模型利用 GPU（8×L20）量化为低精度格式，完成后自动注册为平台新模型。</span>
+      </div>
+      <div class="toolbar">
+        <div class="filters">
+          <select class="filter-select" id="statusFilter" onchange="renderTasks()">
+            <option value="">全部状态</option>
+            <option value="pending">待提交</option>
+            <option value="queued">排队中</option>
+            <option value="running">运行中</option>
+            <option value="completed">已完成</option>
+            <option value="failed">失败</option>
+            <option value="cancelled">已取消</option>
+          </select>
+          <button class="btn btn-primary" onclick="renderTasks()">🔍 查询</button>
+        </div>
+        <button class="btn btn-primary" onclick="openCreate()">＋ 创建量化任务</button>
+      </div>
+
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>任务名称</th><th>基座模型</th><th>量化方案</th><th>状态</th><th>进度</th><th>结果模型</th><th>创建人</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="taskTable"></tbody>
+        </table>
+        <div style="padding:20px;text-align:center;color:#8c8c8c;font-size:13px;" id="emptyHint">暂无匹配的任务</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 创建弹窗 ========== -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <div class="modal-header"><span>创建量化任务</span><button class="modal-close" onclick="closeCreate()">✕</button></div>
+    <div class="modal-body">
+      <!-- 快速模板 -->
+      <div class="template-bar">
+        <span class="template-label">⚡ 快速模板：</span>
+        <span class="template-btn" onclick="applyTemplate('gptq',4,16,128)">W4A16-GPTQ</span>
+        <span class="template-btn" onclick="applyTemplate('awq',4,16,128)">W4A16-AWQ</span>
+        <span class="template-btn" onclick="applyTemplate('bitsandbytes',4,16,64)">W4A16-bnb</span>
+        <span class="template-btn" onclick="applyTemplate('gptq',8,16,128)">W8A16-GPTQ</span>
+        <span class="template-btn" onclick="applyTemplate('awq',3,16,128)">W3A16-AWQ（极限压缩）</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">任务名称 <span class="required">*</span></label>
+        <input class="form-input" placeholder="如：Qwen2.5-7B GPTQ量化" id="taskName">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">选择平台模型（可选）</label>
+          <select class="form-input" id="baseModel">
+            <option value="">— 不选，直接填 HF 模型 ID —</option>
+            <option value="1">MiniMax-M3-AWQ (minimax)</option>
+            <option value="2">Qwen3.8 (qwen)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">HF 模型 ID <span class="required">*</span></label>
+          <input class="form-input" placeholder="如：Qwen/Qwen2.5-7B" id="hfModelId">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">量化算法 <span class="required">*</span></label>
+          <select class="form-input" id="algorithm">
+            <option value="gptq">GPTQ（推荐，通用最优）</option><option value="awq">AWQ（激活感知，精度优）</option><option value="bitsandbytes">bitsandbytes（轻量快速）</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">权重精度 <span class="required">*</span></label>
+          <select class="form-input" id="weightBits">
+            <option value="2">2 bit（极致压缩）</option><option value="3">3 bit（折中）</option><option value="4" selected>4 bit（推荐）</option><option value="8">8 bit（几乎无损）</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">分组大小 <span class="required">*</span></label>
+          <select class="form-input" id="groupSize">
+            <option value="32">32</option><option value="64">64</option><option value="128" selected>128（推荐）</option><option value="256">256</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">校准样本数</label>
+          <input class="form-input" type="number" value="256" id="calibSamples">
+        </div>
+        <div class="form-group">
+          <label class="form-label">输出路径（可选）</label>
+          <input class="form-input" placeholder="留空使用默认路径 /models/" id="outputPath">
+        </div>
+      </div>
+
+      <!-- 校准数据集 -->
+      <div class="form-group">
+        <label class="form-label">校准数据集</label>
+        <div style="margin-bottom:6px;font-size:13px;color:#8c8c8c;">留空使用默认 wikitext-2。也可自定义校准文本（每行一条）或上传文件：</div>
+        <div style="display:flex;gap:8px;margin-bottom:6px;">
+          <button class="btn btn-sm btn-primary" onclick="useWikitext()">使用默认 wikitext</button>
+          <label class="btn btn-sm" style="cursor:pointer;">📁 上传文件<input type="file" accept=".txt,.jsonl" style="display:none" onchange="handleFileUpload(event)"></label>
+        </div>
+        <textarea class="form-input" rows="3" placeholder="在此粘贴自定义校准文本，每行一条样本&#10;如：&#10;What is the capital of France?&#10;Explain quantum computing in simple terms.&#10;Write a Python function to sort a list." id="calibText"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeCreate()">取消</button>
+      <button class="btn btn-primary" onclick="createTask()">创建并提交</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 详情弹窗（含日志） ========== -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal" style="width:680px;">
+    <div class="modal-header"><span>量化任务详情</span><button class="modal-close" onclick="closeDetail()">✕</button></div>
+    <div class="modal-body">
+      <table class="desc-table">
+        <tr><td>任务名称</td><td id="dName">-</td></tr>
+        <tr><td>基座模型</td><td id="dModel">-</td></tr>
+        <tr><td>量化算法</td><td id="dAlgo">-</td></tr>
+        <tr><td>精度</td><td id="dPrecision">-</td></tr>
+        <tr><td>分组大小</td><td id="dGroup">-</td></tr>
+        <tr><td>校准样本</td><td id="dCalib">-</td></tr>
+        <tr><td>状态</td><td id="dStatus">-</td></tr>
+        <tr><td>进度</td><td id="dProgress">-</td></tr>
+        <tr><td>输出路径</td><td id="dOutput">-</td></tr>
+        <tr><td>结果模型</td><td id="dResultModel">-</td></tr>
+        <tr><td>错误信息</td><td id="dError" style="color:#ff4d4f">-</td></tr>
+        <tr><td>创建人</td><td id="dCreator">-</td></tr>
+        <tr><td>创建时间</td><td id="dCreated">-</td></tr>
+      </table>
+
+      <!-- 运行日志（#6 新增） -->
+      <div style="margin-top:16px;">
+        <div style="font-size:14px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;">
+          <span>📋 运行日志</span>
+          <span id="logEmpty" style="font-size:12px;color:#8c8c8c;font-weight:400;">任务尚未运行</span>
+        </div>
+        <div class="log-panel" id="logPanel">
+          <div class="log-line"><span class="time">[10:30:01]</span> <span class="bold">INFO</span> <span class="info">开始量化任务 #2 (Llama3-8B AWQ 4bit)</span></div>
+          <div class="log-line"><span class="time">[10:30:03]</span> <span class="bold">INFO</span> <span class="info">从 HuggingFace 下载模型 meta-llama/Meta-Llama-3-8B ...</span></div>
+          <div class="log-line"><span class="time">[10:32:15]</span> <span class="bold">INFO</span> <span class="info">模型下载完成 (4.7GB)</span></div>
+          <div class="log-line"><span class="time">[10:32:16]</span> <span class="bold">INFO</span> <span class="info">加载校准数据 (256 条 wikitext)</span></div>
+          <div class="log-line"><span class="time">[10:32:20]</span> <span class="bold">INFO</span> <span class="info">开始 AWQ 量化 (W4A16, group_size=128)</span></div>
+          <div class="log-line"><span class="time">[10:35:40]</span> <span class="bold">INFO</span> <span class="info">量化进度: 45% - 处理第 45/100 个 transformer block</span></div>
+          <div class="log-line"><span class="time">[10:35:41]</span> <span class="bold">INFO</span> <span class="info">当前显存占用: 12.4GB / 48GB (L20)</span></div>
+          <div class="log-line" style="color:#888;font-style:italic;">... 任务运行中，日志持续更新 ...</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeDetail()">关闭</button></div>
+  </div>
+</div>
+
+<script>
+const statusMap = { pending:'待提交', queued:'排队中', running:'运行中', completed:'已完成', failed:'失败', cancelled:'已取消' };
+const colorMap = { pending:'grey', queued:'blue', running:'orange', completed:'green', failed:'red', cancelled:'grey' };
+
+let tasks = [
+  { id:1, name:'Qwen2.5-7B GPTQ量化', hf_model_id:'Qwen/Qwen2.5-7B-Instruct', algorithm:'gptq', weight_bits:4, activation_bits:16, group_size:128, calib_samples:256, calibration:'default', output_path:'/models/Qwen--Qwen2.5-7B-Instruct-gptq-w4a16', status:'completed', progress:100, error_message:null, result_model_id:5, created_by:'admin', created_at:'2026-09-13 10:00', updated_at:'2026-09-13 10:35' },
+  { id:2, name:'Llama3-8B AWQ 4bit', hf_model_id:'meta-llama/Meta-Llama-3-8B', algorithm:'awq', weight_bits:4, activation_bits:16, group_size:128, calib_samples:256, calibration:'default', output_path:null, status:'running', progress:45, error_message:null, result_model_id:null, created_by:'admin', created_at:'2026-09-13 10:30', updated_at:'2026-09-13 10:55' },
+  { id:3, name:'CodeLlama-7B bnb', hf_model_id:'codellama/CodeLlama-7b-hf', algorithm:'bitsandbytes', weight_bits:4, activation_bits:16, group_size:64, calib_samples:128, calibration:'default', output_path:null, status:'pending', progress:0, error_message:null, result_model_id:null, created_by:'admin', created_at:'2026-09-13 11:00', updated_at:'2026-09-13 11:00' },
+  { id:4, name:'Mistral-7B AWQ 3bit', hf_model_id:'mistralai/Mistral-7B-v0.3', algorithm:'awq', weight_bits:3, activation_bits:16, group_size:128, calib_samples:256, calibration:'default', output_path:null, status:'failed', progress:15, error_message:'CUDA out of memory. 3bit AWQ on 7B model requires ~20GB VRAM.', result_model_id:null, created_by:'admin', created_at:'2026-09-13 09:00', updated_at:'2026-09-13 09:12' },
+  { id:5, name:'DeepSeek-Coder-6.7B AWQ', hf_model_id:'deepseek-ai/deepseek-coder-6.7b-instruct', algorithm:'awq', weight_bits:4, activation_bits:16, group_size:128, calib_samples:256, calibration:'custom', output_path:'/models/deepseek-coder-6.7b-awq-w4a16', status:'completed', progress:100, error_message:null, result_model_id:6, created_by:'admin', created_at:'2026-09-12 14:00', updated_at:'2026-09-12 14:28' },
+];
+
+let taskIdCounter = 5;
+
+function renderTasks() {
+  const filter = document.getElementById('statusFilter').value;
+  const filtered = filter ? tasks.filter(t => t.status === filter) : tasks;
+  const tbody = document.getElementById('taskTable');
+  const empty = document.getElementById('emptyHint');
+  if (filtered.length === 0) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = filtered.map(t => {
+    const tc = colorMap[t.status];
+    const pc = t.status === 'completed' ? 'green' : t.status === 'failed' ? 'red' : t.status === 'running' ? 'orange' : 'grey';
+    const acts = [];
+    acts.push(`<a class="ln" href="javascript:void(0)" onclick="viewDetail(${t.id})">详情</a>`);
+    if (t.status === 'pending') acts.push(`<a class="ln" href="javascript:void(0)" onclick="submitTask(${t.id})">提交执行</a>`);
+    if (['queued','running'].includes(t.status)) acts.push(`<a class="ln ln-danger" href="javascript:void(0)" onclick="cancelTask(${t.id})">取消</a>`);
+    if (t.status === 'failed') acts.push(`<a class="ln" href="javascript:void(0)" onclick="retryTask(${t.id})">🔄 重试</a>`);
+    if (t.status === 'completed') acts.push(`<a class="ln" href="javascript:void(0)" onclick="alert('下载: /models/${t.hf_model_id.replace('/','--')}-${t.algorithm}-w${t.weight_bits}a${t.activation_bits}.tar.gz')">⬇ 下载</a>`);
+    if (['completed','failed','cancelled'].includes(t.status)) acts.push(`<a class="ln ln-danger" href="javascript:void(0)" onclick="deleteTask(${t.id})">删除</a>`);
+    const modelLink = t.result_model_id ? `<a class="ln" href="javascript:void(0)" onclick="alert('跳转到模型详情 ID=${t.result_model_id}')">#${t.result_model_id}</a>` : '-';
+    return `<tr>
+      <td><b>${t.name}</b></td>
+      <td style="font-size:13px;color:#666;">${t.hf_model_id}</td>
+      <td><span class="tag tag-${tc}">${t.algorithm.toUpperCase()} W${t.weight_bits}A${t.activation_bits}</span></td>
+      <td><span class="status"><span class="status-dot status-${t.status}"></span>${statusMap[t.status]}</span></td>
+      <td><div class="progress"><div class="progress-bar"><div class="progress-fill progress-fill-${pc}" style="width:${t.progress}%"></div></div><span class="progress-text">${t.progress}%</span></div></td>
+      <td>${modelLink}</td>
+      <td style="color:#666;">${t.created_by}</td>
+      <td>${acts.join(' ')}</td>
+    </tr>`;
+  }).join('');
+}
+
+function viewDetail(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('dName').textContent = t.name;
+  document.getElementById('dModel').textContent = t.hf_model_id;
+  document.getElementById('dAlgo').textContent = t.algorithm.toUpperCase();
+  document.getElementById('dPrecision').textContent = `W${t.weight_bits}A${t.activation_bits}`;
+  document.getElementById('dGroup').textContent = t.group_size;
+  document.getElementById('dCalib').textContent = t.calib_samples + (t.calibration === 'custom' ? '（自定义）' : '（默认 wikitext）');
+  document.getElementById('dStatus').innerHTML = `<span class="tag tag-${colorMap[t.status]}">${statusMap[t.status]}</span>`;
+  document.getElementById('dProgress').textContent = t.progress + '%';
+  document.getElementById('dOutput').textContent = t.output_path || '-';
+  document.getElementById('dResultModel').innerHTML = t.result_model_id
+    ? `<a class="ln" href="javascript:void(0)" onclick="alert('跳转到模型 ID=${t.result_model_id}')">模型 #${t.result_model_id}（查看详情 →）</a>`
+    : '-';
+  document.getElementById('dError').textContent = t.error_message || '-';
+  document.getElementById('dCreator').textContent = t.created_by;
+  document.getElementById('dCreated').textContent = t.created_at;
+  document.getElementById('detailModal').classList.add('show');
+
+  // 日志面板：根据状态显示不同内容
+  const logPanel = document.getElementById('logPanel');
+  const logEmpty = document.getElementById('logEmpty');
+  if (t.status === 'pending') {
+    logPanel.innerHTML = `<div class="log-line" style="color:#888;font-style:italic;">任务等待提交...</div>`;
+    logEmpty.textContent = '等待执行';
+  } else if (t.status === 'running') {
+    logPanel.innerHTML = `
+      <div class="log-line"><span class="time">[10:30:01]</span> <span class="bold">INFO</span> <span class="info">开始量化任务 #${t.id} (${t.name})</span></div>
+      <div class="log-line"><span class="time">[10:30:03]</span> <span class="bold">INFO</span> <span class="info">从 HuggingFace 下载模型 ${t.hf_model_id} ...</span></div>
+      <div class="log-line"><span class="time">[10:32:15]</span> <span class="bold">INFO</span> <span class="info">模型下载完成</span></div>
+      <div class="log-line"><span class="time">[10:32:20]</span> <span class="bold">INFO</span> <span class="info">开始 ${t.algorithm.toUpperCase()} 量化 (W${t.weight_bits}A${t.activation_bits}, group_size=${t.group_size})</span></div>
+      <div class="log-line"><span class="time">[10:35:40]</span> <span class="bold">INFO</span> <span class="info">量化进度: ${t.progress}% - 处理第 ${Math.floor(t.progress*1.3)}/${Math.floor(t.progress*1.3+15)} 个 transformer block</span></div>
+      <div class="log-line"><span class="time">[10:35:41]</span> <span class="bold">INFO</span> <span class="info">当前显存占用: 12.4GB / 48GB (L20)</span></div>
+      <div class="log-line" style="color:#888;font-style:italic;">... 任务运行中，日志持续更新 ...</div>`;
+    logEmpty.textContent = '实时更新中';
+  } else if (t.status === 'completed') {
+    logPanel.innerHTML = `
+      <div class="log-line"><span class="time">[10:30:01]</span> <span class="bold">INFO</span> <span class="info">开始量化任务 #${t.id}</span></div>
+      <div class="log-line"><span class="time">[10:32:15]</span> <span class="bold">INFO</span> <span class="info">模型下载完成</span></div>
+      <div class="log-line"><span class="time">[10:50:20]</span> <span class="bold">INFO</span> <span class="info">量化完成！模型保存在 ${t.output_path}</span></div>
+      <div class="log-line"><span class="time">[10:50:22]</span> <span class="bold">INFO</span> <span class="info">注册量化模型到平台 (模型ID #${t.result_model_id})</span></div>
+      <div class="log-line"><span class="time">[10:50:25]</span> <span class="bold" style="color:#52c41a;">SUCCESS</span> <span class="info">任务完成，耗时 20 分钟</span></div>`;
+    logEmpty.textContent = '任务已完成';
+  } else if (t.status === 'failed') {
+    logPanel.innerHTML = `
+      <div class="log-line"><span class="time">[09:00:01]</span> <span class="bold">INFO</span> <span class="info">开始量化任务 #${t.id}</span></div>
+      <div class="log-line"><span class="time">[09:02:10]</span> <span class="bold">INFO</span> <span class="info">模型下载完成</span></div>
+      <div class="log-line"><span class="time">[09:05:30]</span> <span class="bold">INFO</span> <span class="info">开始 AWQ 量化</span></div>
+      <div class="log-line"><span class="time">[09:12:18]</span> <span class="warn">WARN</span> <span class="info">显存占用: 21.6GB / 48GB</span></div>
+      <div class="log-line"><span class="time">[09:12:20]</span> <span class="err">ERROR</span> <span class="info">CUDA out of memory. ${t.error_message}</span></div>`;
+    logEmpty.textContent = '任务失败';
+  }
+}
+
+function closeDetail() { document.getElementById('detailModal').classList.remove('show'); }
+function openCreate() { document.getElementById('createModal').classList.add('show'); }
+function closeCreate() { document.getElementById('createModal').classList.remove('show'); }
+
+function applyTemplate(algo, wBits, aBits, gSize) {
+  document.getElementById('algorithm').value = algo;
+  document.getElementById('weightBits').value = String(wBits);
+  document.getElementById('groupSize').value = String(gSize);
+}
+
+function useWikitext() { document.getElementById('calibText').value = '（使用默认 wikitext-2 数据集，256 条）'; }
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) { document.getElementById('calibText').value = ev.target.result.slice(0,500) + '\n...（文件已上传，共 ' + file.size + ' 字节）'; };
+  reader.readAsText(file);
+}
+
+function createTask() {
+  const name = document.getElementById('taskName').value.trim() || '新量化任务';
+  const hf = document.getElementById('hfModelId').value.trim() || 'Qwen/Qwen2.5-7B';
+  const algo = document.getElementById('algorithm').value;
+  const bits = parseInt(document.getElementById('weightBits').value);
+  const gs = parseInt(document.getElementById('groupSize').value);
+  closeCreate();
+  const t = {
+    id: ++taskIdCounter, name, hf_model_id: hf, algorithm: algo,
+    weight_bits: bits, activation_bits: 16, group_size: gs,
+    calib_samples: parseInt(document.getElementById('calibSamples').value) || 256,
+    calibration: document.getElementById('calibText').value.trim() && !document.getElementById('calibText').value.includes('默认') ? 'custom' : 'default',
+    output_path: null, status: 'pending', progress: 0, error_message: null,
+    result_model_id: null, created_by: 'admin',
+    created_at: new Date().toLocaleString(), updated_at: new Date().toLocaleString(),
+  };
+  tasks.unshift(t); renderTasks();
+}
+
+function submitTask(id) { const t = tasks.find(x => x.id === id); if(t){t.status='queued';t.progress=0;renderTasks();} }
+function cancelTask(id) { const t = tasks.find(x => x.id === id); if(t&&alert('确定取消任务：'+t.name+'？')){t.status='cancelled';renderTasks();} }
+function retryTask(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  t.status = 'queued'; t.progress = 0; t.error_message = null;
+  t.updated_at = new Date().toLocaleString();
+  renderTasks();
+}
+function deleteTask(id) { tasks = tasks.filter(x => x.id !== id); renderTasks(); }
+renderTasks();
+</script>
+</body>
+</html>

@@ -18,7 +18,9 @@ RUN pip install --no-cache-dir \
     "passlib>=1.7.4" \
     "bcrypt>=4.0.0" \
     "httpx>=0.27.0" \
-    "python-multipart>=0.0.9"
+    "python-multipart>=0.0.9" \
+    "docker>=7.0.0" \
+    "nvidia-ml-py>=12.0.0"
 
 # 复制应用代码
 COPY app/ ./app/

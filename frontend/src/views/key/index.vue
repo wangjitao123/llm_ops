@@ -44,8 +44,13 @@
         <a-table-column title="QPS 限制" data-index="qps_limit" key="qps_limit" width="90">
           <template #default="{ text }">{{ text || '全局' }}</template>
         </a-table-column>
-        <a-table-column title="Token 配额" key="token_quota" width="110">
-          <template #default="{ record }">{{ record.token_quota ? formatTokenCount(record.token_quota) : '不限' }}</template>
+        <a-table-column title="Token 配额（已用 / 上限）" key="token_quota" width="190">
+          <template #default="{ record }">
+            <template v-if="record.token_quota">
+              {{ formatTokenCount(record.token_used || 0) }} / {{ formatTokenCount(record.token_quota) }}
+            </template>
+            <span v-else>不限</span>
+          </template>
         </a-table-column>
         <a-table-column title="过期时间" data-index="expires_at" key="expires_at" width="150">
           <template #default="{ text }">{{ text ? formatTime(text) : '永久' }}</template>
@@ -93,6 +98,18 @@
           <a-col :span="8">
             <a-form-item label="过期时间">
               <a-date-picker v-model:value="form.expires_at" style="width: 100%" show-time />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="每分钟请求数 (RPM)">
+              <a-input-number v-model:value="form.rpm_limit" :min="1" placeholder="不限" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="每日请求数 (RPD)">
+              <a-input-number v-model:value="form.rpd_limit" :min="1" placeholder="不限" style="width: 100%" />
             </a-form-item>
           </a-col>
         </a-row>
@@ -161,6 +178,8 @@ const form = reactive({
   model_ids: [] as number[],
   qps_limit: undefined as number | undefined,
   token_quota: undefined as number | undefined,
+  rpm_limit: undefined as number | undefined,
+  rpd_limit: undefined as number | undefined,
   expires_at: undefined as any
 })
 
@@ -185,7 +204,7 @@ async function loadModels() {
 
 function openCreateModal() {
   editing.value = false
-  Object.assign(form, { id: undefined, name: '', application_id: undefined, model_ids: [], qps_limit: undefined, token_quota: undefined, expires_at: undefined })
+  Object.assign(form, { id: undefined, name: '', application_id: undefined, model_ids: [], qps_limit: undefined, token_quota: undefined, rpm_limit: undefined, rpd_limit: undefined, expires_at: undefined })
   modalOpen.value = true
 }
 
@@ -194,6 +213,7 @@ function openEditModal(record: KeyItem) {
   Object.assign(form, {
     id: record.id, name: record.name, application_id: record.application_id,
     model_ids: record.model_ids || [], qps_limit: record.qps_limit, token_quota: record.token_quota,
+    rpm_limit: record.rpm_limit, rpd_limit: record.rpd_limit,
     expires_at: record.expires_at ? dayjs(record.expires_at) : undefined
   })
   modalOpen.value = true
@@ -210,6 +230,8 @@ async function handleSubmit() {
     }
     if (payload.qps_limit === undefined) delete payload.qps_limit
     if (payload.token_quota === undefined) delete payload.token_quota
+    if (payload.rpm_limit === undefined) delete payload.rpm_limit
+    if (payload.rpd_limit === undefined) delete payload.rpd_limit
     delete payload.id
 
     if (editing.value && form.id) {

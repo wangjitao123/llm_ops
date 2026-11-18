@@ -1,14 +1,35 @@
 from datetime import datetime, timezone, timedelta, date
 from celery import shared_task
 from app.tasks.worker import celery_app
-from app.core.database import async_session
+from app.core.database import task_async_session as async_session
 from app.models.key import AppKey
+from app.models.pricing import ModelPricing
 from app.models.token import TokenStatsHourly, TokenStatsDaily, ApiRequestLog
 from sqlalchemy import select, func, delete
 
 # 时区：服务器容器 TZ=Asia/Shanghai；日志 created_at 存 UTC（TIMESTAMPTZ）。
 # 统计按"东八区自然小时/自然日"切窗，避免 UTC/本地日期错位。
 LOCAL_TZ = timezone(timedelta(hours=8))
+
+
+def _cost_expr():
+    """单行请求的计费表达式（元）。
+
+    费用 = 输入 token × 输入单价 + 输出 token × 输出单价，单价口径是「元 / 千 token」，
+    所以整体再除以 1000。未配置价格的模型用 COALESCE(..., 0) → 计 0 元。
+
+    这样写的好处：cost 对 token 是线性的，所以可以直接在 SQL 里 SUM，
+    即使按 Key / 应用聚合（跨多个模型）也能一条 SQL 算完，不用回表逐行算。
+    """
+    return (
+        ApiRequestLog.prompt_tokens * func.coalesce(ModelPricing.input_price_per_1k, 0)
+        + ApiRequestLog.completion_tokens * func.coalesce(ModelPricing.output_price_per_1k, 0)
+    ) / 1000
+
+
+def _to_cost(value) -> float:
+    """SUM 可能返回 None（无数据）或 Decimal，统一成 6 位小数 float。"""
+    return round(float(value or 0), 6)
 
 
 def _to_local(dt: datetime) -> datetime:
@@ -70,6 +91,9 @@ async def _aggregate_hourly(hour_offsets: list[int] | None = None, days_back: in
                 func.sum(ApiRequestLog.completion_tokens).label("completion_tokens"),
                 func.sum(ApiRequestLog.total_tokens).label("total_tokens"),
                 func.avg(ApiRequestLog.response_time_ms).label("avg_response_ms"),
+                func.sum(_cost_expr()).label("cost"),
+            ).select_from(ApiRequestLog).outerjoin(
+                ModelPricing, ModelPricing.model_id == ApiRequestLog.model_id
             ).where(
                 ApiRequestLog.created_at >= start_utc,
                 ApiRequestLog.created_at < end_utc,
@@ -87,6 +111,7 @@ async def _aggregate_hourly(hour_offsets: list[int] | None = None, days_back: in
                     prompt_tokens=row.prompt_tokens or 0,
                     completion_tokens=row.completion_tokens or 0,
                     total_tokens=row.total_tokens or 0,
+                    total_cost=_to_cost(row.cost),
                     avg_response_ms=int(row.avg_response_ms or 0),
                 ))
 
@@ -98,6 +123,9 @@ async def _aggregate_hourly(hour_offsets: list[int] | None = None, days_back: in
                 func.sum(ApiRequestLog.completion_tokens).label("completion_tokens"),
                 func.sum(ApiRequestLog.total_tokens).label("total_tokens"),
                 func.avg(ApiRequestLog.response_time_ms).label("avg_response_ms"),
+                func.sum(_cost_expr()).label("cost"),
+            ).select_from(ApiRequestLog).outerjoin(
+                ModelPricing, ModelPricing.model_id == ApiRequestLog.model_id
             ).where(
                 ApiRequestLog.created_at >= start_utc,
                 ApiRequestLog.created_at < end_utc,
@@ -115,6 +143,7 @@ async def _aggregate_hourly(hour_offsets: list[int] | None = None, days_back: in
                     prompt_tokens=row.prompt_tokens or 0,
                     completion_tokens=row.completion_tokens or 0,
                     total_tokens=row.total_tokens or 0,
+                    total_cost=_to_cost(row.cost),
                     avg_response_ms=int(row.avg_response_ms or 0),
                 ))
 
@@ -127,9 +156,11 @@ async def _aggregate_hourly(hour_offsets: list[int] | None = None, days_back: in
                     func.sum(ApiRequestLog.completion_tokens).label("completion_tokens"),
                     func.sum(ApiRequestLog.total_tokens).label("total_tokens"),
                     func.avg(ApiRequestLog.response_time_ms).label("avg_response_ms"),
+                    func.sum(_cost_expr()).label("cost"),
                 )
                 .select_from(ApiRequestLog)
                 .join(AppKey, AppKey.id == ApiRequestLog.app_key_id)
+                .outerjoin(ModelPricing, ModelPricing.model_id == ApiRequestLog.model_id)
                 .where(
                     ApiRequestLog.created_at >= start_utc,
                     ApiRequestLog.created_at < end_utc,
@@ -149,6 +180,7 @@ async def _aggregate_hourly(hour_offsets: list[int] | None = None, days_back: in
                     prompt_tokens=row.prompt_tokens or 0,
                     completion_tokens=row.completion_tokens or 0,
                     total_tokens=row.total_tokens or 0,
+                    total_cost=_to_cost(row.cost),
                     avg_response_ms=int(row.avg_response_ms or 0),
                 ))
 
@@ -183,6 +215,7 @@ async def _aggregate_daily(days: int = 7):
                 func.sum(TokenStatsHourly.prompt_tokens).label("prompt_tokens"),
                 func.sum(TokenStatsHourly.completion_tokens).label("completion_tokens"),
                 func.sum(TokenStatsHourly.total_tokens).label("total_tokens"),
+                func.sum(TokenStatsHourly.total_cost).label("total_cost"),
                 func.avg(TokenStatsHourly.avg_response_ms).label("avg_response_ms"),
             ).where(
                 TokenStatsHourly.stats_date == d,
@@ -200,6 +233,7 @@ async def _aggregate_daily(days: int = 7):
                     prompt_tokens=row.prompt_tokens or 0,
                     completion_tokens=row.completion_tokens or 0,
                     total_tokens=row.total_tokens or 0,
+                    total_cost=_to_cost(row.total_cost),
                     avg_response_ms=int(row.avg_response_ms or 0),
                 )
                 session.add(daily)

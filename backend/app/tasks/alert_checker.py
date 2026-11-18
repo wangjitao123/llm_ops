@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta, date
 from app.tasks.worker import celery_app
-from app.core.database import async_session
+from app.core.database import task_async_session as async_session
 from app.models.system import AlertRule, AlertLog
 from app.models.token import TokenStatsDaily
 from sqlalchemy import select, func

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "check:templates": "node scripts/check-templates.cjs",
+    "verify": "vue-tsc -b && node scripts/check-templates.cjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"

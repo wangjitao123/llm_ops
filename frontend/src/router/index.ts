@@ -67,6 +67,24 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '模型对比', icon: 'AreaChartOutlined' }
       },
       {
+        path: 'quantization',
+        name: 'Quantization',
+        component: () => import('@/views/quantization/index.vue'),
+        meta: { title: '模型量化', icon: 'BulbOutlined' }
+      },
+      {
+        path: 'deploy',
+        name: 'Deploy',
+        component: () => import('@/views/deploy/index.vue'),
+        meta: { title: '模型部署', icon: 'CloudArrowUpOutlined' }
+      },
+      {
+        path: 'perf',
+        name: 'Perf',
+        component: () => import('@/views/perf/index.vue'),
+        meta: { title: '模型压测', icon: 'DashboardOutlined' }
+      },
+      {
         path: 'system',
         name: 'System',
         component: () => import('@/views/system/index.vue'),

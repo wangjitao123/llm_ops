@@ -10,6 +10,9 @@ celery_app = Celery(
         "app.tasks.log_consumer",
         "app.tasks.stats_aggregator",
         "app.tasks.alert_checker",
+        "app.tasks.quantization_runner",
+        "app.tasks.deployment_tasks",
+        "app.tasks.perf_runner",
     ],
 )
 
@@ -20,8 +23,8 @@ celery_app.conf.update(
     timezone="Asia/Shanghai",
     enable_utc=False,
     task_track_started=True,
-    task_soft_time_limit=300,
-    task_time_limit=600,
+    task_soft_time_limit=3600,     # 1h default; quantization task overrides
+    task_time_limit=10800,          # 3h default
     worker_max_tasks_per_child=1000,
 )
 
@@ -52,5 +55,17 @@ celery_app.conf.beat_schedule = {
     "check-alert-rules": {
         "task": "check_alert_rules",
         "schedule": crontab(minute="*/10"),  # 每 10 分钟
+    },
+    # 部署健康检查（每 30 秒）
+    "deployment-health-check": {
+        "task": "health_check_all",
+        "schedule": 30.0,  # 秒
+    },
+    # GPU 显存采集（每 30 秒）。必须路由到带 GPU 的 worker 队列，
+    # 否则 nvidia-smi / pynvml 在无 GPU 的容器里必然失败。
+    "collect-gpu-stats": {
+        "task": "collect_gpu_stats",
+        "schedule": 30.0,  # 秒
+        "options": {"queue": "quantization"},
     },
 }

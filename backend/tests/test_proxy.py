@@ -177,7 +177,7 @@ async def test_forward_local_model_no_key(proxy_service, mock_db):
     with pytest.MonkeyPatch.context() as mp:
         captured = {}
 
-        async def fake_post(self, url, json=None, headers=None):
+        async def fake_post(self, url, json=None, headers=None, timeout=None, **kwargs):
             captured["url"] = url
             captured["headers"] = headers
             resp = MagicMock()
@@ -206,7 +206,7 @@ async def test_forward_remote_model_with_key(proxy_service, mock_db):
     with pytest.MonkeyPatch.context() as mp:
         captured = {}
 
-        async def fake_post(self, url, json=None, headers=None):
+        async def fake_post(self, url, json=None, headers=None, timeout=None, **kwargs):
             captured["headers"] = headers
             resp = MagicMock()
             resp.status_code = 200

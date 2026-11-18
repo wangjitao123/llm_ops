@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.api.v1 import models, keys, tokens, gateway, finetune, compare, system, proxy
+from app.api.v1 import models, keys, tokens, gateway, finetune, compare, system, proxy, quantization, deployment, perf, pricing
 
 
 @asynccontextmanager
@@ -19,6 +19,8 @@ async def lifespan(app: FastAPI):
         await init_models()
     yield
     # Shutdown
+    from app.core.http import close_http_client
+    await close_http_client()
     await redis_client.close()
 
 
@@ -59,6 +61,10 @@ app.include_router(finetune.router, prefix="/api/v1/finetune", tags=["模型微�
 app.include_router(compare.router, prefix="/api/v1/compare", tags=["模型对比"])
 app.include_router(system.router, prefix="/api/v1/system", tags=["系统管理"])
 app.include_router(proxy.router, tags=["OpenAI兼容接口"])
+app.include_router(quantization.router, prefix="/api/v1/quantization", tags=["模型量化"])
+app.include_router(deployment.router, prefix="/api/v1/deployments", tags=["模型部署"])
+app.include_router(perf.router, prefix="/api/v1/perf", tags=["模型压测"])
+app.include_router(pricing.router, prefix="/api/v1/pricing", tags=["计费单价"])
 
 
 @app.get("/health")
