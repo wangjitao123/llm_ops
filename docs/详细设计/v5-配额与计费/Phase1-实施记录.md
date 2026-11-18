@@ -169,6 +169,11 @@ curl -s localhost:8000/v1/chat/completions -H "Authorization: Bearer $KEY" ...
 
 ## 5. 生产注意
 
+0. **聚合跑在 `celery-worker` 里，不在 api-server**。费用是 Celery 任务算的，所以
+   「只重建 api-server」会导致：页面能配价、统计表有新行、但 `total_cost` 恒为 0。
+   部署时 `api-server` / `web` / `celery-worker` / `celery-beat` 四个服务必须一起重建。
+   （2026-11-18 首版部署文档漏了这条，已在部署包文档中修正。）
+
 1. **表要建出来**。`deploy/docker-compose.yml` 默认 `AUTO_CREATE_TABLES=true`，
    启动即建；若线上关了自动建表，先手工执行：
 
